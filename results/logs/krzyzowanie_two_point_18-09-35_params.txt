@@ -1,0 +1,23 @@
+EKSPERYMENT: krzyzowanie_two_point
+=== KONFIGURACJA EKSPERYMENTU ===
+Cel optymalizacji: Max
+Wymiary (N): 5
+Dziedzina (granice): [-5.0, 5.0]
+
+=== PARAMETRY ALGORYTMU ===
+Wielkosc populacji: 50
+Liczba pokolen: 100
+Dlugosc chromosomu: 80 bitow
+Prawdopodobienstwo krzyzowania: 0.8
+Prawdopodobienstwo mutacji: 0.01
+Prawdopodobienstwo inwersji: 0.1
+Rozmiar elity: 2
+
+=== METODY ===
+Selekcja: tournament
+Krzyzowanie: two_point
+Mutacja: bit_flip
+
+=== WYNIKI ===
+Najlepsza znaleziona wartosc: 125.000000
+Czas wykonania algorytmu: 0.1904 s

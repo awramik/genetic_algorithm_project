@@ -27,35 +27,43 @@ import time
 def run_genetic_algorithm(
         population_size,
         generations,
-        chromosome_length,
+        dimensions,
+        bits_per_variable,
         crossover_rate,
         mutation_rate,
         selection_method,
         crossover_method,
         mutation_method,
-        elite_size=2,
-        inversion_rate=0.1
+        lower_bound,
+        upper_bound,
+        optimization_type,
+        elite_size,
+        inversion_rate
 ):
 
     start_time = time.time()
 
+    chromosome_length = dimensions * bits_per_variable
     population = create_population(population_size, chromosome_length)
 
     best_history = []
+    avg_history = []
 
     for generation in range(generations):
-
-        results = evaluate_population(population)
+        results = evaluate_population(population, dimensions, lower_bound, upper_bound, optimization_type)
 
         best = max(results, key=lambda x: x["fitness"])
-
         best_history.append(best["value"])
 
-        print(f"Generation {generation} | Best value: {best['value']:.6f}")
+        # średnia z danej generacji
+        avg_value = sum(ind["value"] for ind in results) / len(results)
+        avg_history.append(avg_value)
+
+        print(f"Generation {generation} | Best: {best['value']:.6f} | Avg: {avg_value:.6f}")
 
         new_population = []
 
-        elites = elitism(results, elite_size)
+        elites = elitism(results, int(elite_size))
         new_population.extend(elites)
 
         # -------- selection --------
@@ -68,11 +76,9 @@ def run_genetic_algorithm(
 
         # -------- offspring --------
         while len(new_population) < population_size:
-
             p1 = random.choice(parents)
             p2 = random.choice(parents)
 
-            # crossover
             if random.random() < crossover_rate:
 
                 if crossover_method == "one_point":
@@ -90,7 +96,7 @@ def run_genetic_algorithm(
             else:
                 child1, child2 = p1.copy(), p2.copy()
 
-            # mutation
+            # -------- mutation --------
             if mutation_method == "bit_flip":
                 child1 = mutate(child1, mutation_rate)
                 child2 = mutate(child2, mutation_rate)
@@ -107,15 +113,13 @@ def run_genetic_algorithm(
                 child1 = two_point_mutation(child1)
                 child2 = two_point_mutation(child2)
 
-            # inversion
+            # -------- inversion --------
             if random.random() < inversion_rate:
                 child1 = inversion(child1)
-
             if random.random() < inversion_rate:
                 child2 = inversion(child2)
 
             new_population.append(child1)
-
             if len(new_population) < population_size:
                 new_population.append(child2)
 
@@ -123,4 +127,4 @@ def run_genetic_algorithm(
 
     execution_time = time.time() - start_time
 
-    return best_history, execution_time
+    return best_history, avg_history, execution_time
