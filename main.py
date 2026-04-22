@@ -1,9 +1,9 @@
-from ga.genetic_algorithm import run_genetic_algorithm
-from visualization.plotting import plot_convergence
+from gui.app import launch_gui
 
 
 def main():
+    launch_gui()
 
-    history = run_genetic_algorithm()
 
-    plot_convergence(history)
+if __name__ == "__main__":
+    main()

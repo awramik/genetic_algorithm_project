@@ -1,19 +1,17 @@
 import matplotlib.pyplot as plt
 
 
-def plot_convergence(history):
+def create_convergence_figure(history):
 
     generations = list(range(len(history)))
 
-    plt.figure(figsize=(8,5))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
-    plt.plot(generations, history)
+    ax.plot(generations, history, linewidth=2)
 
-    plt.xlabel("Generation")
-    plt.ylabel("Best function value")
+    ax.set_title("Genetic Algorithm Convergence")
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Best Function Value")
+    ax.grid(True)
 
-    plt.title("Genetic Algorithm Convergence")
-
-    plt.grid(True)
-
-    plt.show()
+    return fig
