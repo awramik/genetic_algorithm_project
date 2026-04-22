@@ -38,7 +38,8 @@ def run_genetic_algorithm(
         upper_bound,
         optimization_type,
         elite_size,
-        inversion_rate
+        inversion_rate,
+        progress_callback=None
 ):
 
     start_time = time.time()
@@ -124,6 +125,9 @@ def run_genetic_algorithm(
                 new_population.append(child2)
 
         population = new_population
+
+        if progress_callback:
+            progress_callback(generation + 1, generations)
 
     execution_time = time.time() - start_time
 
