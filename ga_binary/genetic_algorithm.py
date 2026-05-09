@@ -1,24 +1,24 @@
-from ga.population import create_population
-from ga.fitness import evaluate_population
-from ga.selection import (
+from ga_real.population import create_population
+from ga_real.fitness import evaluate_population
+from ga_real.selection import (
     best_selection,
     roulette_selection,
     tournament_selection
 )
-from ga.crossover import (
+from ga_real.crossover import (
     one_point_crossover,
     two_point_crossover,
     uniform_crossover,
     grainy_crossover
 )
-from ga.mutation import (
+from ga_real.mutation import (
     mutate,
     boundary_mutation,
     single_point_mutation,
     two_point_mutation
 )
-from ga.inversion import inversion
-from ga.elitism import elitism
+from ga_real.inversion import inversion
+from ga_real.elitism import elitism
 
 import random
 import time

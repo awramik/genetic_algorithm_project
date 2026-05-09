@@ -4,7 +4,7 @@ import threading
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from ga.genetic_algorithm import run_genetic_algorithm
+from ga_real.genetic_algorithm import run_genetic_algorithm
 from visualization.plotting import create_convergence_figure
 from results.logger import save_results
 
