@@ -1,24 +1,25 @@
-from ga_real.population import create_population
-from ga_real.fitness import evaluate_population
-from ga_real.selection import (
+
+from ga_binary.population import create_population
+from ga_binary.fitness import evaluate_population
+from ga_binary.selection import (
     best_selection,
     roulette_selection,
     tournament_selection
 )
-from ga_real.crossover import (
+from ga_binary.crossover import (
     one_point_crossover,
     two_point_crossover,
     uniform_crossover,
     grainy_crossover
 )
-from ga_real.mutation import (
+from ga_binary.mutation import (
     mutate,
     boundary_mutation,
     single_point_mutation,
     two_point_mutation
 )
-from ga_real.inversion import inversion
-from ga_real.elitism import elitism
+from ga_binary.inversion import inversion
+from ga_binary.elitism import elitism
 
 import random
 import time
@@ -56,7 +57,7 @@ def run_genetic_algorithm(
         best = max(results, key=lambda x: x["fitness"])
         best_history.append(best["value"])
 
-        # średnia z danej generacji
+        # average of a given generation
         avg_value = sum(ind["value"] for ind in results) / len(results)
         avg_history.append(avg_value)
 

@@ -1,59 +1,32 @@
 import random
 
-
-def mutate(individual, mutation_rate):
-    """
-    Bit flip mutation.
-    """
-
-    mutated = individual.copy()
-
-    for i in range(len(mutated)):
-
+def mutate_uniform(individual, mutation_rate, lower_bound, upper_bound):
+    """Uniform mutation: replaces a gene with a new random value from the domain."""
+    mutated = []
+    for gene in individual:
         if random.random() < mutation_rate:
-
-            mutated[i] = 1 - mutated[i]
-
+            mutated.append(random.uniform(lower_bound, upper_bound))
+        else:
+            mutated.append(gene)
     return mutated
 
-
-def single_point_mutation(individual):
-
-    import random
-
-    mutated = individual.copy()
-
-    index = random.randint(0, len(individual)-1)
-
-    mutated[index] = 1 - mutated[index]
-
+def mutate_gaussian(individual, mutation_rate, lower_bound, upper_bound, sigma=0.5):
+    """Gaussian mutation: adds normally distributed noise N(0, sigma) to the gene."""
+    mutated = []
+    for gene in individual:
+        if random.random() < mutation_rate:
+            new_gene = gene + random.gauss(0, sigma)
+            new_gene = max(lower_bound, min(new_gene, upper_bound))
+            mutated.append(new_gene)
+        else:
+            mutated.append(gene)
     return mutated
 
-
-def two_point_mutation(individual):
-
-    import random
-
-    mutated = individual.copy()
-
-    i1 = random.randint(0, len(individual)-1)
-    i2 = random.randint(0, len(individual)-1)
-
-    mutated[i1] = 1 - mutated[i1]
-    mutated[i2] = 1 - mutated[i2]
-
-    return mutated
-
-
-def boundary_mutation(individual):
-
-    import random
-
-    mutated = individual.copy()
-
-    if random.random() < 0.5:
-        mutated[0] = 1 - mutated[0]
-    else:
-        mutated[-1] = 1 - mutated[-1]
-
-    return mutated
+def mutate_population(population, mutation_rate, lower_bound, upper_bound, mutation_type="gauss"):
+    mutated_pop = []
+    for ind in population:
+        if mutation_type == "uniform":
+            mutated_pop.append(mutate_uniform(ind, mutation_rate, lower_bound, upper_bound))
+        else:
+            mutated_pop.append(mutate_gaussian(ind, mutation_rate, lower_bound, upper_bound))
+    return mutated_pop

@@ -1,3 +1,6 @@
+
+import random
+import time
 from ga_real.population import create_population
 from ga_real.fitness import evaluate_population
 from ga_real.selection import (
@@ -5,30 +8,15 @@ from ga_real.selection import (
     roulette_selection,
     tournament_selection
 )
-from ga_real.crossover import (
-    one_point_crossover,
-    two_point_crossover,
-    uniform_crossover,
-    grainy_crossover
-)
-from ga_real.mutation import (
-    mutate,
-    boundary_mutation,
-    single_point_mutation,
-    two_point_mutation
-)
-from ga_real.inversion import inversion
+from ga_real.crossover import crossover_population
+from ga_real.mutation import mutate_population
 from ga_real.elitism import elitism
-
-import random
-import time
 
 
 def run_genetic_algorithm(
         population_size,
         generations,
         dimensions,
-        bits_per_variable,
         crossover_rate,
         mutation_rate,
         selection_method,
@@ -38,97 +26,82 @@ def run_genetic_algorithm(
         upper_bound,
         optimization_type,
         elite_size,
-        inversion_rate,
         progress_callback=None
 ):
-
     start_time = time.time()
 
-    chromosome_length = dimensions * bits_per_variable
-    population = create_population(population_size, chromosome_length)
+    # STEP 1: Initialize the real population
+    population = create_population(population_size, dimensions, lower_bound, upper_bound)
 
     best_history = []
     avg_history = []
 
     for generation in range(generations):
-        results = evaluate_population(population, dimensions, lower_bound, upper_bound, optimization_type)
+        # STEP 2: Population Assessment
+        evaluated_pop = evaluate_population(population, optimization_type)
 
-        best = max(results, key=lambda x: x["fitness"])
-        best_history.append(best["value"])
-
-        # średnia z danej generacji
-        avg_value = sum(ind["value"] for ind in results) / len(results)
-        avg_history.append(avg_value)
-
-        print(f"Generation {generation} | Best: {best['value']:.6f} | Avg: {avg_value:.6f}")
-
-        new_population = []
-
-        elites = elitism(results, int(elite_size))
-        new_population.extend(elites)
-
-        # -------- selection --------
-        if selection_method == "best":
-            parents = best_selection(results, population_size)
-        elif selection_method == "roulette":
-            parents = roulette_selection(results, population_size)
+        # Sort (for elitism and statistics)
+        if optimization_type == "Min":
+            evaluated_pop.sort(key=lambda x: x['value'])
         else:
-            parents = tournament_selection(results, population_size)
+            evaluated_pop.sort(key=lambda x: x['value'], reverse=True)
 
-        # -------- offspring --------
-        while len(new_population) < population_size:
-            p1 = random.choice(parents)
-            p2 = random.choice(parents)
+        # statistics
+        best_val = evaluated_pop[0]['value']
+        avg_val = sum(ind['value'] for ind in evaluated_pop) / population_size
+        best_history.append(best_val)
+        avg_history.append(avg_val)
 
-            if random.random() < crossover_rate:
+        # STEP 3: Elitism
+        elite_individuals = elitism(evaluated_pop, elite_size)
 
-                if crossover_method == "one_point":
-                    child1, child2 = one_point_crossover(p1, p2)
+        # STEP 4: Selection
+        remaining_size = population_size - len(elite_individuals)
+        if selection_method == "best":
+            selected_parents = best_selection(evaluated_pop, remaining_size)
+        elif selection_method == "roulette":
+            selected_parents = roulette_selection(evaluated_pop, remaining_size)
+        else:
+            selected_parents = tournament_selection(evaluated_pop, remaining_size)
 
-                elif crossover_method == "two_point":
-                    child1, child2 = two_point_crossover(p1, p2)
+        # STEP 5: Crossover
+        offspring = crossover_population(
+            selected_parents,
+            crossover_rate,
+            crossover_type=crossover_method
+        )
 
-                elif crossover_method == "uniform":
-                    child1, child2 = uniform_crossover(p1, p2)
+        # STEP 6: Mutation (uniform or Gauss)
+        population = mutate_population(
+            offspring,
+            mutation_rate,
+            lower_bound,
+            upper_bound,
+            mutation_type=mutation_method
+        )
 
-                else:
-                    child1, child2 = grainy_crossover(p1, p2)
-
-            else:
-                child1, child2 = p1.copy(), p2.copy()
-
-            # -------- mutation --------
-            if mutation_method == "bit_flip":
-                child1 = mutate(child1, mutation_rate)
-                child2 = mutate(child2, mutation_rate)
-
-            elif mutation_method == "boundary":
-                child1 = boundary_mutation(child1)
-                child2 = boundary_mutation(child2)
-
-            elif mutation_method == "single_point":
-                child1 = single_point_mutation(child1)
-                child2 = single_point_mutation(child2)
-
-            else:
-                child1 = two_point_mutation(child1)
-                child2 = two_point_mutation(child2)
-
-            # -------- inversion --------
-            if random.random() < inversion_rate:
-                child1 = inversion(child1)
-            if random.random() < inversion_rate:
-                child2 = inversion(child2)
-
-            new_population.append(child1)
-            if len(new_population) < population_size:
-                new_population.append(child2)
-
-        population = new_population
+        # new population's elite
+        population.extend(elite_individuals)
+        # ensuring a stable population size
+        population = population[:population_size]
 
         if progress_callback:
             progress_callback(generation + 1, generations)
 
-    execution_time = time.time() - start_time
+    end_time = time.time()
+    execution_time = end_time - start_time
 
-    return best_history, avg_history, execution_time
+    # results (the best individual from the last generation)
+    final_eval = evaluate_population(population, optimization_type)
+    if optimization_type == "Min":
+        final_eval.sort(key=lambda x: x['value'])
+    else:
+        final_eval.sort(key=lambda x: x['value'], reverse=True)
+
+    return {
+        "best_individual": final_eval[0]['chromosome'],
+        "best_value": final_eval[0]['value'],
+        "best_history": best_history,
+        "avg_history": avg_history,
+        "execution_time": execution_time
+    }

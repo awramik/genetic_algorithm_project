@@ -1,0 +1,162 @@
+import tkinter as tk
+from tkinter import ttk
+from gui.styles import COLORS, FONTS
+
+
+class MainView:
+    def __init__(self, root):
+        self.root = root
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.main_container = tk.Frame(self.root, bg=COLORS["bg_main"])
+        self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # LEWY PANEL
+        self.sidebar = tk.Frame(self.main_container, bg=COLORS["bg_panel"], width=420)
+        self.sidebar.pack(side="left", fill="y", padx=(0, 20))
+        self.sidebar.pack_propagate(False)
+
+        # GLOBALNA NAZWA EKSPERYMENTU
+        exp_frame = tk.Frame(self.sidebar, bg=COLORS["bg_panel"])
+        exp_frame.pack(fill="x", padx=15, pady=(15, 5))
+        tk.Label(exp_frame, text="Experiment:", bg=COLORS["bg_panel"], font=FONTS["header"], fg=COLORS["accent"]).pack(
+            side="left")
+        self.exp_name_entry = tk.Entry(exp_frame, font=FONTS["body"], relief="solid", bd=1)
+        self.exp_name_entry.insert(0, "Hypersphere_Test")
+        self.exp_name_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
+
+        # ZAKŁADKI (TABS)
+        self.notebook = ttk.Notebook(self.sidebar)
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+
+        self.tab_binary = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
+        self.tab_real = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
+        self.tab_compare = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
+
+        self.notebook.add(self.tab_binary, text="Binary (P1)")
+        self.notebook.add(self.tab_real, text="Real (P2)")
+        self.notebook.add(self.tab_compare, text="Comparison")
+
+        self.setup_binary_tab()
+        self.setup_real_tab()
+        self.setup_comparison_tab()
+
+        # WSPÓLNE PARAMETRY
+        self.setup_shared_parameters()
+
+        # START & PROGRESS
+        self.start_button = tk.Button(self.sidebar, text="START EVOLUTION 🧬",
+                                      bg=COLORS["accent"], fg="white", font=FONTS["button"], pady=12, cursor="hand2")
+        self.start_button.pack(fill="x", padx=20, pady=10)
+
+        self.progress_bar = ttk.Progressbar(self.sidebar, style="SGA.Horizontal.TProgressbar", mode="determinate")
+        self.progress_bar.pack(fill="x", padx=20, pady=5)
+
+        # PRAWY PANEL (WYKRESY)
+        self.plot_panel = tk.Frame(self.main_container, bg="white")
+        self.plot_panel.pack(side="right", fill="both", expand=True)
+
+        self.status_label = tk.Label(self.root, text="Ready. Select parameters and run.",
+                                     anchor="w", bg=COLORS["bg_main"], fg=COLORS["text_muted"], font=FONTS["body"])
+        self.status_label.pack(side="bottom", fill="x", padx=20, pady=5)
+
+    def setup_binary_tab(self):
+        self.add_label(self.tab_binary, "Bits per Variable:")
+        self.bits_entry = self.add_entry(self.tab_binary, "20")
+
+        self.add_label(self.tab_binary, "Inversion Rate:")
+        self.inv_entry = self.add_entry(self.tab_binary, "0.05")
+
+        self.add_label(self.tab_binary, "Crossover Method:")
+        self.cross_combo_bin = ttk.Combobox(self.tab_binary, values=["one_point", "two_point", "uniform", "grainy"],
+                                            state="readonly")
+        self.cross_combo_bin.set("one_point")
+        self.cross_combo_bin.pack(fill="x", padx=20, pady=5)
+
+        self.add_label(self.tab_binary, "Mutation Method:")
+        self.mut_combo_bin = ttk.Combobox(self.tab_binary, values=["bit_flip", "boundary", "single_point", "two_point"],
+                                          state="readonly")
+        self.mut_combo_bin.set("bit_flip")
+        self.mut_combo_bin.pack(fill="x", padx=20, pady=5)
+
+    def setup_real_tab(self):
+        self.add_label(self.tab_real, "Crossover Method:")
+        self.cross_combo_real = ttk.Combobox(self.tab_real,
+                                             values=["arithmetic", "linear", "blx_alpha", "blx_alpha_beta",
+                                                     "averaging"], state="readonly")
+        self.cross_combo_real.set("arithmetic")
+        self.cross_combo_real.pack(fill="x", padx=20, pady=5)
+
+        self.add_label(self.tab_real, "Mutation Method:")
+        self.mut_combo_real = ttk.Combobox(self.tab_real, values=["uniform", "gaussian"], state="readonly")
+        self.mut_combo_real.set("gaussian")
+        self.mut_combo_real.pack(fill="x", padx=20, pady=5)
+
+    def setup_comparison_tab(self):
+        tk.Label(self.tab_compare, text="Algorithm Comparison 🏆", font=FONTS["title"], bg=COLORS["bg_panel"],
+                 fg=COLORS["accent"]).pack(pady=(20, 10))
+        tk.Label(self.tab_compare, text="Runs both variants sequentially\nand plots a shared convergence curve.",
+                 bg=COLORS["bg_panel"], font=FONTS["body"]).pack(pady=10)
+        self.stats_frame = tk.Frame(self.tab_compare, bg=COLORS["bg_main"], relief="solid", bd=1)
+        self.stats_frame.pack(fill="x", padx=20, pady=20)
+        self.bin_time_label = tk.Label(self.stats_frame, text="Binary Time: -", bg=COLORS["bg_main"],
+                                       font=FONTS["mono"])
+        self.bin_time_label.pack(anchor="w", padx=10, pady=(10, 2))
+        self.real_time_label = tk.Label(self.stats_frame, text="Real Time: -", bg=COLORS["bg_main"], font=FONTS["mono"])
+        self.real_time_label.pack(anchor="w", padx=10, pady=(2, 10))
+
+    def setup_shared_parameters(self):
+        shared_frame = tk.LabelFrame(self.sidebar, text="Shared Parameters", bg=COLORS["bg_panel"],
+                                     font=FONTS["header"])
+        shared_frame.pack(fill="x", padx=15, pady=10)
+
+        def add_param_row(row, label1, widget1, label2, widget2):
+            tk.Label(shared_frame, text=label1, bg=COLORS["bg_panel"]).grid(row=row, column=0, sticky="w", pady=6,
+                                                                            padx=(10, 2))
+            widget1.grid(row=row, column=1, sticky="w", pady=6, padx=2)
+            tk.Label(shared_frame, text=label2, bg=COLORS["bg_panel"]).grid(row=row, column=2, sticky="w", pady=6,
+                                                                            padx=(15, 2))
+            widget2.grid(row=row, column=3, sticky="w", pady=6, padx=(2, 10))
+
+        self.pop_entry = tk.Entry(shared_frame, width=10);
+        self.pop_entry.insert(0, "50")
+        self.gen_entry = tk.Entry(shared_frame, width=10);
+        self.gen_entry.insert(0, "100")
+        add_param_row(0, "Population:", self.pop_entry, "Generations:", self.gen_entry)
+
+        self.dim_entry = tk.Entry(shared_frame, width=10);
+        self.dim_entry.insert(0, "2")
+        self.opt_combo = ttk.Combobox(shared_frame, values=["Min", "Max"], state="readonly", width=7);
+        self.opt_combo.set("Min")
+        add_param_row(1, "Dimensions:", self.dim_entry, "Opt Type:", self.opt_combo)
+
+        self.cr_entry = tk.Entry(shared_frame, width=10);
+        self.cr_entry.insert(0, "0.8")
+        self.mr_entry = tk.Entry(shared_frame, width=10);
+        self.mr_entry.insert(0, "0.1")
+        add_param_row(2, "Cross Rate:", self.cr_entry, "Mut Rate:", self.mr_entry)
+
+        self.lb_entry = tk.Entry(shared_frame, width=10);
+        self.lb_entry.insert(0, "-5.0")
+        self.ub_entry = tk.Entry(shared_frame, width=10);
+        self.ub_entry.insert(0, "5.0")
+        add_param_row(3, "Lower Bound:", self.lb_entry, "Upper Bound:", self.ub_entry)
+
+        self.elite_entry = tk.Entry(shared_frame, width=10);
+        self.elite_entry.insert(0, "2")
+        self.selection_combo = ttk.Combobox(shared_frame, values=["best", "roulette", "tournament"], state="readonly",
+                                            width=8);
+        self.selection_combo.set("tournament")
+        add_param_row(4, "Elite Size:", self.elite_entry, "Selection:", self.selection_combo)
+
+    def add_label(self, parent, text):
+        tk.Label(parent, text=text, font=FONTS["header"], bg=COLORS["bg_panel"], fg=COLORS["text_main"]).pack(
+            anchor="w", padx=20, pady=(10, 0))
+
+    def add_entry(self, parent, default_val):
+        entry = tk.Entry(parent, font=FONTS["body"], relief="solid", bd=1);
+        entry.insert(0, default_val)
+        entry.pack(fill="x", padx=20, pady=5)
+        return entry
+    

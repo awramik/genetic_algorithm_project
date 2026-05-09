@@ -19,7 +19,7 @@ def evaluate_individual(individual, dimensions, lower_bound, upper_bound, optimi
     x = np.array(real_values)
     function_value = sphere(x)
 
-    # obsługa Min/Max
+    # Min/Max
     if optimization_type == "Min":
         fitness = 1.0 / (1.0 + function_value)
     else:

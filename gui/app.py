@@ -1,280 +1,217 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import threading
+import traceback
+import inspect
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from ga_real.genetic_algorithm import run_genetic_algorithm
+from gui.styles import COLORS, configure_styles
+from gui.view import MainView
+
+from ga_binary.genetic_algorithm import run_genetic_algorithm as run_binary_ga
+from ga_real.genetic_algorithm import run_genetic_algorithm as run_real_ga
 from visualization.plotting import create_convergence_figure
 from results.logger import save_results
 
 
-def launch_gui():
-    # --- LOGIKA WĄTKÓW I CALLBACKÓW ---
+class GeneticAlgorithmController:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Genetic Algorithm")
+        self.root.geometry("1400x900")
+        self.root.configure(bg=COLORS["bg_main"])
 
-    def finalize_ui(best_history, avg_history, execution_time, filename):
-        fig = create_convergence_figure(best_history, avg_history)
+        configure_styles()
 
-        for widget in plot_frame.winfo_children():
+        # 1. VIEW
+        self.view = MainView(self.root)
+
+        # 2. LOGIC
+        self.view.start_button.config(command=self.on_run_click)
+        self.view.notebook.bind("<<NotebookTabChanged>>", self.on_tab_change)
+
+    # --- UI EVENTS ---
+    def on_tab_change(self, event):
+        for widget in self.view.plot_panel.winfo_children():
             widget.destroy()
+        self.view.status_label.config(text="Mode changed. Ready for computation.", fg=COLORS["text_muted"])
 
-        canvas_plot = FigureCanvasTkAgg(fig, master=plot_frame)
-        canvas_plot.draw()
-        canvas_plot.get_tk_widget().pack(fill="both", expand=True)
-
-        toolbar = NavigationToolbar2Tk(canvas_plot, plot_frame)
-        toolbar.config(background="#FFFFFF")
-        for button in toolbar.winfo_children():
-            button.config(background="#FFFFFF", borderwidth=0)
-        toolbar.update()
-
-        status_label.config(
-            text=f" ✅ Sukces! Wynik: {best_history[-1]:.6f}  |  ⏱ Czas: {execution_time:.4f}s  |  💾 Plik: {filename}",
-            fg="#059669"
-        )
-        start_button.config(state="normal", text="START OPTYMALIZACJI 🧬🚀")
-        progress_bar.configure(value=0)
-
-    def handle_error(error_msg):
-        status_label.config(text=" ❌ Błąd silnika obliczeniowego", fg="#DC2626")
-        messagebox.showerror("Błąd krytyczny", f"Wystąpił błąd podczas obliczeń:\n{error_msg}")
-        start_button.config(state="normal", text="START OPTYMALIZACJI 🧬🚀")
-        progress_bar.configure(value=0)
-
-    def calculation_thread_worker(params):
+    def on_run_click(self):
         try:
-            def progress_updater(current, total):
-                val = (current / total) * 100
-                root.after(0, lambda: progress_bar.configure(value=val))
+            lb = float(self.view.lb_entry.get())
+            ub = float(self.view.ub_entry.get())
+            if lb < -5.0 or ub > 5.0:
+                proceed = messagebox.askyesno("Domain Warning",
+                                              "The standard domain for Hypersphere is [-5.0, 5.0]. Continue?")
+                if not proceed: return
+        except ValueError:
+            messagebox.showerror("Input Error", "Lower and Upper bounds must be numerical.")
+            return
 
-            best_history, avg_history, execution_time = run_genetic_algorithm(
-                population_size=params['population_size'],
-                generations=params['generations'],
-                dimensions=params['dimensions'],
-                bits_per_variable=params['bits_per_variable'],
-                crossover_rate=params['crossover_rate'],
-                mutation_rate=params['mutation_rate'],
-                selection_method=params['selection_method'],
-                crossover_method=params['crossover_method'],
-                mutation_method=params['mutation_method'],
-                lower_bound=params['lower_bound'],
-                upper_bound=params['upper_bound'],
-                optimization_type=params['optimization_type'],
-                elite_size=params['elite_size'],
-                inversion_rate=params['inversion_rate'],
-                progress_callback=progress_updater
-            )
+        active_tab = self.view.notebook.index(self.view.notebook.select())
+        self.view.start_button.config(state="disabled", text="Evolution in progress... ⏳")
+        self.view.progress_bar["value"] = 0
+        threading.Thread(target=self.execute_ga, args=(active_tab,), daemon=True).start()
 
-            filename = save_results(
-                experiment_name=params['experiment_name'],
-                population_size=params['population_size'],
-                generations=params['generations'],
-                chromosome_length=params['dimensions'] * params['bits_per_variable'],
-                crossover_rate=params['crossover_rate'],
-                mutation_rate=params['mutation_rate'],
-                selection_method=params['selection_method'],
-                crossover_method=params['crossover_method'],
-                mutation_method=params['mutation_method'],
-                best_history=best_history,
-                avg_history=avg_history,
-                execution_time=execution_time,
-                optimization_type=params['optimization_type'],
-                dimensions=params['dimensions'],
-                lower_bound=params['lower_bound'],
-                upper_bound=params['upper_bound'],
-                elite_size=params['elite_size'],
-                inversion_rate=params['inversion_rate']
-            )
+    def update_progress(self, val):
+        self.view.progress_bar["value"] = val
 
-            root.after(0, lambda: finalize_ui(best_history, avg_history, execution_time, filename))
+    # --- HELPERS ---
+    def parse_results(self, raw_data):
+        if isinstance(raw_data, dict):
+            return {'best_history': raw_data['best_history'], 'avg_history': raw_data['avg_history'],
+                    'execution_time': raw_data['execution_time'], 'best_value': raw_data.get('best_value',
+                                                                                             raw_data['best_history'][
+                                                                                                 -1] if raw_data[
+                                                                                                 'best_history'] else 0)}
+        elif isinstance(raw_data, tuple):
+            return {'best_history': raw_data[0], 'avg_history': raw_data[1], 'execution_time': raw_data[2],
+                    'best_value': raw_data[0][-1] if raw_data[0] else 0}
+        return raw_data
 
+    def smart_logger(self, results, params, ga_type):
+        try:
+            pool = {
+                'best_history': results['best_history'], 'avg_history': results['avg_history'],
+                'execution_time': results['execution_time'],
+                'selection_method': params['sel'], 'crossover_method': params['cross'],
+                'mutation_method': params['mut'],
+                'population_size': params['pop'], 'generations': params['gen'], 'dimensions': params['dim'],
+                'bits': params['bits'],
+                'bits_per_variable': params['bits'], 'crossover_rate': params['cr'], 'mutation_rate': params['mr'],
+                'lower_bound': params['lb'], 'upper_bound': params['ub'], 'optimization_type': params['opt'],
+                'elite_size': params['elite'], 'inversion_rate': params['inv'], 'experiment_name': params['exp_name']
+            }
+            sig = inspect.signature(save_results)
+            kwargs = {param: pool.get(param, None) for param in sig.parameters.keys()}
+            return save_results(**kwargs)
         except Exception as e:
-            root.after(0, lambda: handle_error(str(e)))
+            print(f"Logger Error: {e}")
+            return f"log_{params['exp_name']}_{ga_type.lower()}.csv"
 
-    def run_algorithm():
+    # --- MAIN LOOP ---
+    def execute_ga(self, tab_index):
         try:
-            pop_size = int(population_entry.get())
-            if pop_size < 2: raise ValueError("Populacja musi mieć min. 2 osobników.")
-            gens = int(generations_entry.get())
-            dims = int(dimensions_entry.get())
-            c_rate = float(crossover_entry.get())
-            m_rate = float(mutation_entry.get())
-            elite = int(elite_entry.get())
-            if elite >= pop_size: raise ValueError("Elita musi być mniejsza od populacji.")
-
-            params = {
-                "experiment_name": exp_name_entry.get().replace(" ", "_") or "eksperyment",
-                "population_size": pop_size,
-                "generations": gens,
-                "dimensions": dims,
-                "bits_per_variable": int(bits_entry.get()),
-                "crossover_rate": c_rate,
-                "mutation_rate": m_rate,
-                "inversion_rate": float(inversion_entry.get()),
-                "elite_size": elite,
-                "lower_bound": float(lower_entry.get()),
-                "upper_bound": float(upper_entry.get()),
-                "optimization_type": opt_type_combo.get(),
-                "selection_method": selection_combo.get(),
-                "crossover_method": crossover_combo.get(),
-                "mutation_method": mutation_combo.get()
+            p = {
+                'pop': int(self.view.pop_entry.get()), 'gen': int(self.view.gen_entry.get()),
+                'dim': int(self.view.dim_entry.get()),
+                'cr': float(self.view.cr_entry.get()), 'mr': float(self.view.mr_entry.get()),
+                'lb': float(self.view.lb_entry.get()),
+                'ub': float(self.view.ub_entry.get()), 'opt': self.view.opt_combo.get(),
+                'elite': int(self.view.elite_entry.get()),
+                'sel': self.view.selection_combo.get(), 'bits': int(self.view.bits_entry.get()),
+                'inv': float(self.view.inv_entry.get()),
+                'exp_name': self.view.exp_name_entry.get()
             }
 
-            start_button.config(state="disabled", text="🧬 OBLICZENIA W TOKU...")
-            status_label.config(text=" ⏳ Trwają obliczenia... Aplikacja pozostaje responsywna.", fg="#1E40AF")
+            if tab_index == 0:  # BINARY P1
+                p['cross'] = self.view.cross_combo_bin.get();
+                p['mut'] = self.view.mut_combo_bin.get()
 
-            calc_thread = threading.Thread(target=calculation_thread_worker, args=(params,), daemon=True)
-            calc_thread.start()
+                def cb(c, t):
+                    self.root.after(0, lambda: self.update_progress((c / t) * 100))
+
+                raw = run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'], p['sel'], p['cross'],
+                                    p['mut'], p['lb'], p['ub'], p['opt'], p['elite'], p['inv'], cb)
+                res = self.parse_results(raw)
+                filename = self.smart_logger(res, p, "Binary")
+                self.root.after(0, lambda: self.finalize_single(res, "Binary (P1)", filename))
+
+            elif tab_index == 1:  # REAL P2
+                p['cross'] = self.view.cross_combo_real.get();
+                p['mut'] = self.view.mut_combo_real.get()
+
+                def cb(c, t):
+                    self.root.after(0, lambda: self.update_progress((c / t) * 100))
+
+                raw = run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'], p['cross'], p['mut'],
+                                  p['lb'], p['ub'], p['opt'], p['elite'], cb)
+                res = self.parse_results(raw)
+                filename = self.smart_logger(res, p, "Real")
+                self.root.after(0, lambda: self.finalize_single(res, "Real (P2)", filename))
+
+            elif tab_index == 2:  # COMPARISON
+                p_bin = p.copy();
+                p_bin['cross'] = self.view.cross_combo_bin.get();
+                p_bin['mut'] = self.view.mut_combo_bin.get()
+
+                def cb_b(c, t):
+                    self.root.after(0, lambda: self.update_progress((c / t) * 50))
+
+                res_bin = self.parse_results(
+                    run_binary_ga(p_bin['pop'], p_bin['gen'], p_bin['dim'], p_bin['bits'], p_bin['cr'], p_bin['mr'],
+                                  p_bin['sel'], p_bin['cross'], p_bin['mut'], p_bin['lb'], p_bin['ub'], p_bin['opt'],
+                                  p_bin['elite'], p_bin['inv'], cb_b))
+
+                p_real = p.copy();
+                p_real['cross'] = self.view.cross_combo_real.get();
+                p_real['mut'] = self.view.mut_combo_real.get()
+
+                def cb_r(c, t):
+                    self.root.after(0, lambda: self.update_progress(50 + (c / t) * 50))
+
+                res_real = self.parse_results(
+                    run_real_ga(p_real['pop'], p_real['gen'], p_real['dim'], p_real['cr'], p_real['mr'], p_real['sel'],
+                                p_real['cross'], p_real['mut'], p_real['lb'], p_real['ub'], p_real['opt'],
+                                p_real['elite'], cb_r))
+                self.root.after(0, lambda: self.finalize_comparison(res_bin, res_real))
 
         except Exception as e:
-            messagebox.showerror("Błąd danych", f"Sprawdź parametry:\n{str(e)}")
+            traceback.print_exc()
+            self.root.after(0, lambda: messagebox.showerror("Execution Error", f"A critical error occurred:\n{str(e)}"))
+            self.root.after(0, self.reset_ui)
 
-    # ===== KONSTRUKCJA UI =====
+    # --- RYSOWANIE I ZAKOŃCZENIE ---
+    def finalize_single(self, results, ga_type, filename):
+        for widget in self.view.plot_panel.winfo_children(): widget.destroy()
+        fig = create_convergence_figure(results['best_history'], results['avg_history'])
+        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel);
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
+        toolbar.config(background="#FFFFFF");
+        toolbar.update()
+
+        msg = f"✅ {ga_type} Success! Result: {results['best_value']:.6f} | Time: {results['execution_time']:.3f}s | File: {filename}"
+        self.view.status_label.config(text=msg, fg=COLORS["success"])
+        self.reset_ui()
+
+    def finalize_comparison(self, res_bin, res_real):
+        self.view.bin_time_label.config(text=f"Binary Time: {res_bin['execution_time']:.4f} s")
+        self.view.real_time_label.config(text=f"Real Time: {res_real['execution_time']:.4f} s")
+        for widget in self.view.plot_panel.winfo_children(): widget.destroy()
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(res_bin['best_history'], label="Binary Encoding (P1)", color="red", linewidth=2)
+        ax.plot(res_real['best_history'], label="Real Encoding (P2)", color="blue", linewidth=2, linestyle="--")
+        ax.set_title("Convergence Comparison: Binary vs Real", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Generations");
+        ax.set_ylabel("Best Fitness")
+        ax.legend();
+        ax.grid(True, linestyle=":", alpha=0.7);
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel);
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel);
+        toolbar.update()
+
+        msg = f"✅ Comparison finished! Value difference: {abs(res_bin['best_value'] - res_real['best_value']):.6f}"
+        self.view.status_label.config(text=msg, fg=COLORS["success"])
+        self.reset_ui()
+
+    def reset_ui(self):
+        self.view.start_button.config(state="normal", text="START EVOLUTION 🧬")
+        self.view.progress_bar["value"] = 100
+
+
+def launch_gui():
     root = tk.Tk()
-    root.title("SGA Pro - Optymalizacja Hypersphere")
-    root.geometry("1600x950")
-
-    BG_COLOR, PANEL_BG, BORDER_COLOR = "#F1F5F9", "#FFFFFF", "#E2E8F0"
-    TEXT_MAIN, TEXT_MUTED = "#0F172A", "#64748B"
-    ACCENT_COLOR, ACCENT_HOVER = "#1E40AF", "#1E3A8A"
-    ENTRY_BG, HEADER_BG = "#EFF6FF", "#1E293B"
-
-    root.configure(bg=BG_COLOR)
-    style = ttk.Style(root)
-    style.theme_use('clam')
-
-    # STYL SCROLLBARA
-    style.configure("Vertical.TScrollbar", gripcount=0, background="#CBD5E1",
-                    troughcolor=PANEL_BG, bordercolor=PANEL_BG, arrowcolor=PANEL_BG)
-
-    style.configure("TEntry", fieldbackground=ENTRY_BG, foreground=TEXT_MAIN, bordercolor=BORDER_COLOR, padding=6)
-
-    # STYL COMBOBOXÓW
-    style.configure("TCombobox", fieldbackground=ENTRY_BG, background=PANEL_BG, bordercolor=BORDER_COLOR,
-                    arrowcolor=ACCENT_COLOR, padding=6)
-    style.map("TCombobox", fieldbackground=[("readonly", ENTRY_BG)])
-    root.option_add("*TCombobox*Listbox.background", PANEL_BG)
-    root.option_add("*TCombobox*Listbox.selectBackground", ACCENT_COLOR)
-
-    # STYL PROGRESS BAR
-    style.configure("SGA.Horizontal.TProgressbar", troughcolor=BG_COLOR, bordercolor=BORDER_COLOR,
-                    background=ACCENT_COLOR, thickness=12)
-
-    # HEADER
-    top_header = tk.Frame(root, bg=HEADER_BG, height=65)
-    top_header.pack(side="top", fill="x")
-    tk.Label(top_header, text="🧬 ALGORYTM GENETYCZNY (SGA) • Optymalizacja Hypersphere",
-             bg=HEADER_BG, fg="white", font=("Segoe UI", 14, "bold")).pack(side="left", padx=35, pady=18)
-
-    main_container = tk.Frame(root, bg=BG_COLOR)
-    main_container.pack(fill="both", expand=True)
-
-    # WYKRES
-    plot_card = tk.Frame(main_container, bg=PANEL_BG, highlightthickness=1, highlightbackground=BORDER_COLOR)
-    plot_card.pack(side="left", fill="both", expand=True, padx=(35, 15), pady=35)
-    plot_frame = tk.Frame(plot_card, bg=PANEL_BG)
-    plot_frame.pack(fill="both", expand=True, padx=25, pady=25)
-
-    # Placeholder
-    fig_p, ax_p = plt.subplots(figsize=(8, 5), facecolor=PANEL_BG)
-    ax_p.text(0.5, 0.5, 'Skonfiguruj parametry i rozpocznij ewolucję ', ha='center', va='center', color=TEXT_MUTED,
-              fontweight='bold', fontsize=13)
-    ax_p.axis('off')
-    canvas_p = FigureCanvasTkAgg(fig_p, master=plot_frame)
-    canvas_p.draw()
-    canvas_p.get_tk_widget().pack(fill="both", expand=True)
-
-    # PANEL STEROWANIA
-    control_card = tk.Frame(main_container, bg=PANEL_BG, highlightthickness=1, highlightbackground=BORDER_COLOR)
-    control_card.pack(side="right", fill="y", padx=(15, 35), pady=35)
-
-    canvas = tk.Canvas(control_card, bg=PANEL_BG, highlightthickness=0, width=380)
-    scrollbar = ttk.Scrollbar(control_card, orient="vertical", command=canvas.yview, style="Vertical.TScrollbar")
-    scrollable_frame = tk.Frame(canvas, bg=PANEL_BG)
-
-    scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=380)
-    canvas.configure(yscrollcommand=scrollbar.set)
-
-    def _on_mousewheel(event):
-        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-    scrollbar.pack(side="right", fill="y")
-    canvas.pack(side="left", fill="both", expand=True)
-
-    # Formularz
-    def add_input(parent, label, default, is_section=False):
-        if is_section:
-            tk.Label(parent, text=label, bg=PANEL_BG, fg=ACCENT_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w",
-                                                                                                          pady=(15, 5))
-        else:
-            tk.Label(parent, text=label, bg=PANEL_BG, fg=TEXT_MAIN, font=("Segoe UI", 10)).pack(anchor="w")
-        entry = ttk.Entry(parent);
-        entry.insert(0, default);
-        entry.pack(fill="x", pady=(0, 12))
-        return entry
-
-    cont = tk.Frame(scrollable_frame, bg=PANEL_BG)
-    cont.pack(fill="both", expand=True, padx=30, pady=20)
-
-    tk.Label(cont, text="⚙️ Konfiguracja Parametrów ", bg=PANEL_BG, fg=ACCENT_COLOR, font=("Segoe UI", 16, "bold")).pack(
-        anchor="w", pady=(0, 20))
-
-    exp_name_entry = add_input(cont, "NAZWA EKSPERYMENTU", "eksperyment_1", True)
-    population_entry = add_input(cont, "POPULACJA", "50", True)
-    generations_entry = add_input(cont, "Liczba pokoleń", "100")
-    dimensions_entry = add_input(cont, "Wymiary N", "5")
-    bits_entry = add_input(cont, "Bity (Precyzja)", "16")
-    crossover_entry = add_input(cont, "OPERATORY", "0.8", True)
-    mutation_entry = add_input(cont, "Prawd. mutacji", "0.01")
-    inversion_entry = add_input(cont, "Prawd. inwersji", "0.1")
-    elite_entry = add_input(cont, "Rozmiar elity", "2")
-
-    tk.Label(cont, text="CEL I ZAKRES", bg=PANEL_BG, fg=ACCENT_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w",
-                                                                                                         pady=(15, 5))
-    rf = tk.Frame(cont, bg=PANEL_BG);
-    rf.pack(fill="x")
-    lower_entry = ttk.Entry(rf, width=10);
-    lower_entry.insert(0, "-5");
-    lower_entry.pack(side="left")
-    tk.Label(rf, text=" do ", bg=PANEL_BG).pack(side="left")
-    upper_entry = ttk.Entry(rf, width=10);
-    upper_entry.insert(0, "5");
-    upper_entry.pack(side="left")
-
-    opt_type_combo = ttk.Combobox(cont, values=["Min", "Max"], state="readonly")
-    opt_type_combo.set("Min");
-    opt_type_combo.pack(fill="x", pady=(10, 15))
-
-    tk.Label(cont, text="METODYKA", bg=PANEL_BG, fg=ACCENT_COLOR, font=("Segoe UI", 9, "bold")).pack(anchor="w",
-                                                                                                     pady=(15, 5))
-    selection_combo = ttk.Combobox(cont, values=["tournament", "roulette", "best"], state="readonly")
-    selection_combo.set("tournament");
-    selection_combo.pack(fill="x", pady=5)
-    crossover_combo = ttk.Combobox(cont, values=["one_point", "two_point", "uniform", "grainy"], state="readonly")
-    crossover_combo.set("one_point");
-    crossover_combo.pack(fill="x", pady=5)
-    mutation_combo = ttk.Combobox(cont, values=["bit_flip", "boundary", "single_point", "two_point"], state="readonly")
-    mutation_combo.set("bit_flip");
-    mutation_combo.pack(fill="x", pady=(5, 25))
-
-    start_button = tk.Button(cont, text="START OPTYMALIZACJI 🧬🚀", command=run_algorithm,
-                             bg=ACCENT_COLOR, fg="white", font=("Segoe UI", 11, "bold"), pady=15, bd=0, cursor="hand2")
-    start_button.pack(fill="x", pady=(0, 20))
-
-    progress_bar = ttk.Progressbar(cont, style="SGA.Horizontal.TProgressbar", mode="determinate")
-    progress_bar.pack(fill="x", pady=(5, 10))
-
-    # STATUS BAR
-    status_frame = tk.Frame(root, bg=PANEL_BG, highlightthickness=1, highlightbackground=BORDER_COLOR)
-    status_frame.pack(side="bottom", fill="x")
-    status_label = tk.Label(status_frame, text=" 🟢 System gotowy do pracy", bg=PANEL_BG, fg=TEXT_MUTED,
-                            font=("Segoe UI", 10), pady=12)
-    status_label.pack(side="left", padx=10)
-
+    app = GeneticAlgorithmController(root)
     root.mainloop()
 
 
-if __name__ == "__main__": launch_gui()
+if __name__ == "__main__":
+    launch_gui()
