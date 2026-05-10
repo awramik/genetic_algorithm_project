@@ -161,24 +161,42 @@ class GeneticAlgorithmController:
     def smart_logger(self, results, params, ga_type):
         try:
             pool = {
-                'best_history': results['best_history'], 'avg_history': results['avg_history'],
+                'best_history': results['best_history'],
+                'avg_history': results['avg_history'],
                 'execution_time': results['execution_time'],
-                'selection_method': params['sel'], 'crossover_method': params['cross'],
-                'alpha': params['alpha'], 'beta': params['beta'],
-                'mutation_method': params['mut'],
-                'sigma': params['sigma'],
-                'population_size': params['pop'], 'generations': params['gen'], 'dimensions': params['dim'],
-                'bits': params['bits'],
-                'bits_per_variable': params['bits'], 'crossover_rate': params['cr'], 'mutation_rate': params['mr'],
-                'lower_bound': params['lb'], 'upper_bound': params['ub'], 'optimization_type': params['opt'],
-                'elite_size': params['elite'], 'inversion_rate': params['inv'], 'experiment_name': params['exp_name']
+                'selection_method': params.get('sel'),
+                'crossover_method': params.get('cross'),
+                'alpha': params.get('alpha'),
+                'beta': params.get('beta'),
+                'mutation_method': params.get('mut'),
+                'sigma': params.get('sigma'),
+                'population_size': params.get('pop'),
+                'generations': params.get('gen'),
+                'dimensions': params.get('dim'),
+
+                # calculate chromosome length for binary mode only
+                'chromosome_length': params.get('bits') * params.get('dim') if params.get('bits') and params.get(
+                    'dim') else None,
+
+                'crossover_rate': params.get('cr'),
+                'mutation_rate': params.get('mr'),
+                'lower_bound': params.get('lb'),
+                'upper_bound': params.get('ub'),
+                'optimization_type': params.get('opt'),
+                'elite_size': params.get('elite'),
+
+                # prevents KeyError in Real mode
+                'inversion_rate': params.get('inv'),
+                'experiment_name': params.get('exp_name')
             }
             sig = inspect.signature(save_results)
             kwargs = {param: pool.get(param, None) for param in sig.parameters.keys()}
             return save_results(**kwargs)
         except Exception as e:
             print(f"Logger Error: {e}")
-            return f"log_{params['exp_name']}_{ga_type.lower()}.csv"
+            import traceback
+            traceback.print_exc()
+            return f"log_{params.get('exp_name', 'error')}_{ga_type.lower()}.csv"
 
     # --- MAIN LOOP ---
     def execute_ga(self, tab_index, p):

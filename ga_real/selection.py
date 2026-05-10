@@ -1,3 +1,4 @@
+
 import random
 
 
@@ -29,6 +30,10 @@ def roulette_selection(results, num_parents):
 
     total_fitness = sum(fitness_values)
 
+    # if the entire population has fitness = 0, the chances are equal (random selection)
+    if total_fitness == 0:
+        return [r["chromosome"] for r in random.choices(results, k=num_parents)]
+
     probabilities = [f / total_fitness for f in fitness_values]
 
     selected = []
@@ -53,15 +58,15 @@ def tournament_selection(results, num_parents, tournament_size=3):
     """
     Tournament selection.
     """
-
     selected = []
 
+    actual_tournament_size = min(tournament_size, len(results))
+
     for _ in range(num_parents):
+        tournament = random.sample(results, actual_tournament_size)
 
-        tournament = random.sample(results, tournament_size)
+        winner = max(tournament, key=lambda ind: ind["fitness"])
 
-        best = max(tournament, key=lambda x: x["fitness"])
-
-        selected.append(best["chromosome"])
+        selected.append(winner["chromosome"])
 
     return selected

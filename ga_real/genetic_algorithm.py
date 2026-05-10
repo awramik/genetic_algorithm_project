@@ -87,6 +87,10 @@ def run_genetic_algorithm(
             sigma=sigma
         )
 
+        # clamping
+        for i in range(len(population)):
+            population[i] = [max(lower_bound, min(gene, upper_bound)) for gene in population[i]]
+
         # new population's elite
         population.extend(elite_individuals)
         # ensuring a stable population size

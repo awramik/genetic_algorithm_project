@@ -30,6 +30,10 @@ def roulette_selection(results, num_parents):
 
     total_fitness = sum(fitness_values)
 
+    # if the entire population has fitness = 0, the chances are equal (random selection)
+    if total_fitness == 0:
+        return [r["chromosome"] for r in random.choices(results, k=num_parents)]
+
     probabilities = [f / total_fitness for f in fitness_values]
 
     selected = []
