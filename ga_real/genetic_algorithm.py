@@ -2,7 +2,7 @@
 import random
 import time
 from ga_real.population import create_population
-from ga_real.fitness import evaluate_population
+from ga_real.fitness import evaluate_population, evaluate_individual
 from ga_real.selection import (
     best_selection,
     roulette_selection,
@@ -26,6 +26,7 @@ def run_genetic_algorithm(
         upper_bound,
         optimization_type,
         elite_size,
+        alpha=0.5, beta=0.75, sigma=0.5,
         progress_callback=None
 ):
     start_time = time.time()
@@ -65,10 +66,15 @@ def run_genetic_algorithm(
             selected_parents = tournament_selection(evaluated_pop, remaining_size)
 
         # STEP 5: Crossover
+        fitness_func = lambda ind: evaluate_individual(ind, optimization_type)[0]
+
         offspring = crossover_population(
             selected_parents,
             crossover_rate,
-            crossover_type=crossover_method
+            crossover_type=crossover_method,
+            fitness_func=fitness_func,
+            alpha=alpha,
+            beta=beta
         )
 
         # STEP 6: Mutation (uniform or Gauss)
@@ -77,7 +83,8 @@ def run_genetic_algorithm(
             mutation_rate,
             lower_bound,
             upper_bound,
-            mutation_type=mutation_method
+            mutation_type=mutation_method,
+            sigma=sigma
         )
 
         # new population's elite

@@ -22,11 +22,11 @@ def mutate_gaussian(individual, mutation_rate, lower_bound, upper_bound, sigma=0
             mutated.append(gene)
     return mutated
 
-def mutate_population(population, mutation_rate, lower_bound, upper_bound, mutation_type="gauss"):
+def mutate_population(population, mutation_rate, lower_bound, upper_bound, mutation_type="gaussian", sigma=0.5):
     mutated_pop = []
     for ind in population:
         if mutation_type == "uniform":
             mutated_pop.append(mutate_uniform(ind, mutation_rate, lower_bound, upper_bound))
         else:
-            mutated_pop.append(mutate_gaussian(ind, mutation_rate, lower_bound, upper_bound))
+            mutated_pop.append(mutate_gaussian(ind, mutation_rate, lower_bound, upper_bound, sigma=sigma))
     return mutated_pop

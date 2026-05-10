@@ -7,7 +7,6 @@ def save_results(
         experiment_name,
         population_size,
         generations,
-        chromosome_length,
         crossover_rate,
         mutation_rate,
         selection_method,
@@ -21,41 +20,59 @@ def save_results(
         lower_bound,
         upper_bound,
         elite_size,
-        inversion_rate
+        chromosome_length=None,
+        inversion_rate=None,
+        alpha=None,
+        beta=None,
+        sigma=None
 ):
     os.makedirs("results/logs", exist_ok=True)
     timestamp = datetime.now().strftime("%H-%M-%S")
-
     base_name = f"{experiment_name}_{timestamp}"
 
-    # 1. Zapis konfiguracji do pliku TXT
+    # 1. Saving configuration to a TXT file
     txt_filename = f"results/logs/{base_name}_params.txt"
     with open(txt_filename, "w", encoding="utf-8") as file:
-        file.write(f"EKSPERYMENT: {experiment_name}\n")
-        file.write("=== KONFIGURACJA EKSPERYMENTU ===\n")
-        file.write(f"Cel optymalizacji: {optimization_type}\n")
-        file.write(f"Wymiary (N): {dimensions}\n")
-        file.write(f"Dziedzina (granice): [{lower_bound}, {upper_bound}]\n\n")
+        file.write(f"EXPERIMENT: {experiment_name}\n")
+        file.write("=== EXPERIMENT CONFIGURATION ===\n")
+        file.write(f"Optimisation type: {optimization_type}\n")
+        file.write(f"Dimensions (N): {dimensions}\n")
+        file.write(f"Domain (boundary): [{lower_bound}, {upper_bound}]\n\n")
 
-        file.write("=== PARAMETRY ALGORYTMU ===\n")
-        file.write(f"Wielkosc populacji: {population_size}\n")
-        file.write(f"Liczba pokolen: {generations}\n")
-        file.write(f"Dlugosc chromosomu: {chromosome_length} bitow\n")
-        file.write(f"Prawdopodobienstwo krzyzowania: {crossover_rate}\n")
-        file.write(f"Prawdopodobienstwo mutacji: {mutation_rate}\n")
-        file.write(f"Prawdopodobienstwo inwersji: {inversion_rate}\n")
-        file.write(f"Rozmiar elity: {elite_size}\n\n")
+        file.write("=== ALGORITHM PARAMETERS ===\n")
+        file.write(f"Population size: {population_size}\n")
+        file.write(f"Generations: {generations}\n")
+        file.write(f"Crossover rate: {crossover_rate}\n")
+        file.write(f"Mutation rate: {mutation_rate}\n")
+        file.write(f"Elite size: {elite_size}\n")
 
-        file.write("=== METODY ===\n")
-        file.write(f"Selekcja: {selection_method}\n")
-        file.write(f"Krzyzowanie: {crossover_method}\n")
-        file.write(f"Mutacja: {mutation_method}\n\n")
+        # specific params for binary chromosome
+        if chromosome_length is not None:
+            file.write(f"Chromosome length: {chromosome_length} bits\n")
+        if inversion_rate is not None:
+            file.write(f"Inversion rate: {inversion_rate}\n")
 
-        file.write("=== WYNIKI ===\n")
-        file.write(f"Najlepsza znaleziona wartosc: {best_history[-1]:.6f}\n")
-        file.write(f"Czas wykonania algorytmu: {execution_time:.4f} s\n")
+        file.write("\n=== METHODS ===\n")
+        file.write(f"Selection: {selection_method}\n")
+        file.write(f"Crossover: {crossover_method}\n")
 
-    # 2. Zapis CSV (zoptymalizowany pod Pythona)
+        # specific parameters for BLX crossover
+        if alpha is not None:
+            file.write(f"  -> BLX Alpha: {alpha}\n")
+        if beta is not None:
+            file.write(f"  -> BLX Beta: {beta}\n")
+
+        file.write(f"Mutation: {mutation_method}\n")
+
+        # specific parameters for gaussian mutation
+        if sigma is not None:
+            file.write(f"  -> Gauss Sigma: {sigma}\n")
+
+        file.write("\n=== RESULTS ===\n")
+        file.write(f"Best found value: {best_history[-1]:.6f}\n")
+        file.write(f"Execution time: {execution_time:.4f} s\n")
+
+    # 2. CSV file
     csv_filename = f"results/logs/{base_name}_history.csv"
     with open(csv_filename, "w", newline='', encoding="utf-8") as file:
         writer = csv.writer(file, delimiter=',')

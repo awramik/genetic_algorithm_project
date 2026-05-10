@@ -6,6 +6,22 @@ from gui.styles import COLORS, FONTS
 class MainView:
     def __init__(self, root):
         self.root = root
+
+        self.main_container = None
+        self.sidebar = None
+        self.exp_name_entry = None
+        self.cross_combo_real = None
+        self.alpha_entry = None
+        self.notebook = None
+        self.tab_binary = None
+        self.tab_real = None
+        self.tab_compare = None
+        self.start_button = None
+        self.progress_bar = None
+        self.plot_panel = None
+        self.main_container = None
+        self.status_label = None
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -81,17 +97,75 @@ class MainView:
         self.mut_combo_bin.pack(fill="x", padx=20, pady=5)
 
     def setup_real_tab(self):
-        self.add_label(self.tab_real, "Crossover Method:")
-        self.cross_combo_real = ttk.Combobox(self.tab_real,
-                                             values=["arithmetic", "linear", "blx_alpha", "blx_alpha_beta",
-                                                     "averaging"], state="readonly")
+        # --- CROSSOVER ---
+        self.cross_sect = tk.Frame(self.tab_real, bg=COLORS["bg_panel"])
+        self.cross_sect.pack(fill="x", pady=5)
+
+        self.add_label(self.cross_sect, "Crossover Method:")
+        self.cross_combo_real = ttk.Combobox(
+            self.cross_sect,
+            values=["arithmetic", "linear", "blx_alpha", "blx_alpha_beta", "averaging"],
+            state="readonly"
+        )
         self.cross_combo_real.set("arithmetic")
         self.cross_combo_real.pack(fill="x", padx=20, pady=5)
 
-        self.add_label(self.tab_real, "Mutation Method:")
-        self.mut_combo_real = ttk.Combobox(self.tab_real, values=["uniform", "gaussian"], state="readonly")
+        # BLX (Alfa, Beta)
+        self.blx_frame = tk.Frame(self.cross_sect, bg=COLORS["bg_panel"])
+
+        # Tworzymy widgety, ale nie pakujemy ich jeszcze
+        self.alpha_label = tk.Label(self.blx_frame, text="BLX Alpha (\u03b1):", font=FONTS["header"],
+                                    bg=COLORS["bg_panel"], fg=COLORS["text_main"])
+        self.alpha_entry = tk.Entry(self.blx_frame, font=FONTS["body"], relief="solid", bd=1)
+        self.alpha_entry.insert(0, "0.5")
+
+        self.beta_label = tk.Label(self.blx_frame, text="BLX Beta (\u03b2):", font=FONTS["header"],
+                                   bg=COLORS["bg_panel"], fg=COLORS["text_main"])
+        self.beta_entry = tk.Entry(self.blx_frame, font=FONTS["body"], relief="solid", bd=1)
+        self.beta_entry.insert(0, "0.75")
+
+        # --- MUTATION ---
+        self.mut_sect = tk.Frame(self.tab_real, bg=COLORS["bg_panel"])
+        self.mut_sect.pack(fill="x", pady=5)
+
+        self.add_label(self.mut_sect, "Mutation Method:")
+        self.mut_combo_real = ttk.Combobox(self.mut_sect, values=["uniform", "gaussian"], state="readonly")
         self.mut_combo_real.set("gaussian")
         self.mut_combo_real.pack(fill="x", padx=20, pady=5)
+
+        # Gaussian Sigma
+        self.gauss_frame = tk.Frame(self.mut_sect, bg=COLORS["bg_panel"])
+        self.sigma_label = tk.Label(self.gauss_frame, text="Gauss Sigma (\u03c3):", font=FONTS["header"],
+                                    bg=COLORS["bg_panel"], fg=COLORS["text_main"])
+        self.sigma_entry = tk.Entry(self.gauss_frame, font=FONTS["body"], relief="solid", bd=1)
+        self.sigma_entry.insert(0, "0.5")
+
+    def update_visibility(self, event=None):
+        cross_val = self.cross_combo_real.get()
+        mut_val = self.mut_combo_real.get()
+
+        # 1. BLX crossover
+        if "blx" in cross_val:
+            self.blx_frame.pack(fill="x")  # Pakuje się NA KOŃCU swojej sekcji (pod dropdownem)
+            self.alpha_label.pack(anchor="w", padx=20, pady=(10, 0))
+            self.alpha_entry.pack(fill="x", padx=20, pady=5)
+
+            if cross_val == "blx_alpha_beta":
+                self.beta_label.pack(anchor="w", padx=20, pady=(10, 0))
+                self.beta_entry.pack(fill="x", padx=20, pady=5)
+            else:
+                self.beta_label.pack_forget()
+                self.beta_entry.pack_forget()
+        else:
+            self.blx_frame.pack_forget()
+
+        # 2. Gaussian mutation
+        if mut_val == "gaussian":
+            self.gauss_frame.pack(fill="x")
+            self.sigma_label.pack(anchor="w", padx=20, pady=(10, 0))
+            self.sigma_entry.pack(fill="x", padx=20, pady=5)
+        else:
+            self.gauss_frame.pack_forget()
 
     def setup_comparison_tab(self):
         tk.Label(self.tab_compare, text="Algorithm Comparison 🏆", font=FONTS["title"], bg=COLORS["bg_panel"],
@@ -119,34 +193,33 @@ class MainView:
                                                                             padx=(15, 2))
             widget2.grid(row=row, column=3, sticky="w", pady=6, padx=(2, 10))
 
-        self.pop_entry = tk.Entry(shared_frame, width=10);
+        self.pop_entry = tk.Entry(shared_frame, width=10)
         self.pop_entry.insert(0, "50")
-        self.gen_entry = tk.Entry(shared_frame, width=10);
+        self.gen_entry = tk.Entry(shared_frame, width=10)
         self.gen_entry.insert(0, "100")
         add_param_row(0, "Population:", self.pop_entry, "Generations:", self.gen_entry)
 
-        self.dim_entry = tk.Entry(shared_frame, width=10);
+        self.dim_entry = tk.Entry(shared_frame, width=10)
         self.dim_entry.insert(0, "2")
-        self.opt_combo = ttk.Combobox(shared_frame, values=["Min", "Max"], state="readonly", width=7);
+        self.opt_combo = ttk.Combobox(shared_frame, values=["Min", "Max"], state="readonly", width=7)
         self.opt_combo.set("Min")
         add_param_row(1, "Dimensions:", self.dim_entry, "Opt Type:", self.opt_combo)
 
-        self.cr_entry = tk.Entry(shared_frame, width=10);
+        self.cr_entry = tk.Entry(shared_frame, width=10)
         self.cr_entry.insert(0, "0.8")
-        self.mr_entry = tk.Entry(shared_frame, width=10);
+        self.mr_entry = tk.Entry(shared_frame, width=10)
         self.mr_entry.insert(0, "0.1")
         add_param_row(2, "Cross Rate:", self.cr_entry, "Mut Rate:", self.mr_entry)
 
-        self.lb_entry = tk.Entry(shared_frame, width=10);
+        self.lb_entry = tk.Entry(shared_frame, width=10)
         self.lb_entry.insert(0, "-5.0")
-        self.ub_entry = tk.Entry(shared_frame, width=10);
+        self.ub_entry = tk.Entry(shared_frame, width=10)
         self.ub_entry.insert(0, "5.0")
         add_param_row(3, "Lower Bound:", self.lb_entry, "Upper Bound:", self.ub_entry)
 
-        self.elite_entry = tk.Entry(shared_frame, width=10);
+        self.elite_entry = tk.Entry(shared_frame, width=10)
         self.elite_entry.insert(0, "2")
-        self.selection_combo = ttk.Combobox(shared_frame, values=["best", "roulette", "tournament"], state="readonly",
-                                            width=8);
+        self.selection_combo = ttk.Combobox(shared_frame, values=["best", "roulette", "tournament"], state="readonly", width=8)
         self.selection_combo.set("tournament")
         add_param_row(4, "Elite Size:", self.elite_entry, "Selection:", self.selection_combo)
 
@@ -155,7 +228,7 @@ class MainView:
             anchor="w", padx=20, pady=(10, 0))
 
     def add_entry(self, parent, default_val):
-        entry = tk.Entry(parent, font=FONTS["body"], relief="solid", bd=1);
+        entry = tk.Entry(parent, font=FONTS["body"], relief="solid", bd=1)
         entry.insert(0, default_val)
         entry.pack(fill="x", padx=20, pady=5)
         return entry

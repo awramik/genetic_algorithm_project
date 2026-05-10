@@ -85,7 +85,7 @@ def crossover_blx_alpha_beta(parent1, parent2, alpha=0.25, beta=0.75):
     return offspring1, offspring2
 
 
-def crossover_population(population, crossover_rate, crossover_type="arithmetic", fitness_func=None):
+def crossover_population(population, crossover_rate, crossover_type="arithmetic", fitness_func=None, alpha=0.5, beta=0.75):
     new_population = []
     pop_size = len(population)
 
@@ -102,10 +102,10 @@ def crossover_population(population, crossover_rate, crossover_type="arithmetic"
                 o1, o2 = crossover_averaging(p1, p2)
             elif crossover_type == "linear":
                 o1, o2 = crossover_linear(p1, p2, fitness_func)
-            elif crossover_type == "blx_alfa":
-                o1, o2 = crossover_blx_alpha(p1, p2, alpha=0.5)
-            elif crossover_type == "blx_alfa_beta":
-                o1, o2 = crossover_blx_alpha_beta(p1, p2, alpha=0.25, beta=0.75)
+            elif crossover_type == "blx_alpha":  # ZMIANA: alfa -> alpha
+                o1, o2 = crossover_blx_alpha(p1, p2, alpha=alpha)
+            elif crossover_type == "blx_alpha_beta":  # ZMIANA: alfa -> alpha
+                o1, o2 = crossover_blx_alpha_beta(p1, p2, alpha=alpha, beta=beta)
             else:
                 o1, o2 = p1.copy(), p2.copy()
             new_population.extend([o1, o2])

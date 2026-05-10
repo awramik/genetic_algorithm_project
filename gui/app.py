@@ -30,6 +30,9 @@ class GeneticAlgorithmController:
         # 2. LOGIC
         self.view.start_button.config(command=self.on_run_click)
         self.view.notebook.bind("<<NotebookTabChanged>>", self.on_tab_change)
+        self.view.cross_combo_real.bind("<<ComboboxSelected>>", lambda e: self.view.update_visibility())
+        self.view.mut_combo_real.bind("<<ComboboxSelected>>", lambda e: self.view.update_visibility())
+        self.view.update_visibility()
 
     # --- UI EVENTS ---
     def on_tab_change(self, event):
@@ -37,22 +40,107 @@ class GeneticAlgorithmController:
             widget.destroy()
         self.view.status_label.config(text="Mode changed. Ready for computation.", fg=COLORS["text_muted"])
 
-    def on_run_click(self):
+    def get_and_validate_params(self, tab_index):
+        """Validation of the params"""
         try:
-            lb = float(self.view.lb_entry.get())
-            ub = float(self.view.ub_entry.get())
-            if lb < -5.0 or ub > 5.0:
-                proceed = messagebox.askyesno("Domain Warning",
-                                              "The standard domain for Hypersphere is [-5.0, 5.0]. Continue?")
-                if not proceed: return
-        except ValueError:
-            messagebox.showerror("Input Error", "Lower and Upper bounds must be numerical.")
+            # 1. shared params
+            p = {
+                'pop': int(self.view.pop_entry.get()),
+                'gen': int(self.view.gen_entry.get()),
+                'dim': int(self.view.dim_entry.get()),
+                'cr': float(self.view.cr_entry.get()),
+                'mr': float(self.view.mr_entry.get()),
+                'lb': float(self.view.lb_entry.get()),
+                'ub': float(self.view.ub_entry.get()),
+                'opt': self.view.opt_combo.get(),
+                'elite': int(self.view.elite_entry.get()),
+                'sel': self.view.selection_combo.get(),
+                'exp_name': self.view.exp_name_entry.get()
+            }
+
+            # 2. validation of shared params
+            if p['pop'] < 2: raise ValueError("Population size must be at least 2.")
+            if p['gen'] < 1: raise ValueError("The number of generations must be at least 1.")
+            if p['dim'] < 1: raise ValueError("The number of dimensions must be at least 1.")
+
+            if not (0.0 <= p['cr'] <= 1.0):
+                raise ValueError("The crossover probability must be in the range [0, 1].")
+
+            if not (0.0 <= p['mr'] <= 1.0):
+                raise ValueError("The mutation probability (MR) must be in the range [0, 1].")
+
+            if p['lb'] >= p['ub']:
+                raise ValueError("The lower bound (LB) must be less than the upper bound (UB)")
+
+            if p['elite'] < 0 or p['elite'] >= p['pop']:
+                raise ValueError("The size of the elite must be >= 0 and smaller than the total population.")
+
+            # 3. hypersphere domain
+            if p['lb'] < -5.0 or p['ub'] > 5.0:
+                proceed = messagebox.askyesno("Note on Domain",
+                                              "The recommended domain for a Hypersphere function is [-5.0, 5.0].\nAre you sure you want to continue?")
+                if not proceed:
+                    return None
+
+            # 4. binary params
+            if tab_index in [0, 2]:
+                p['bits'] = int(self.view.bits_entry.get())
+                p['inv'] = float(self.view.inv_entry.get())
+                p['cross_bin'] = self.view.cross_combo_bin.get()
+                p['mut_bin'] = self.view.mut_combo_bin.get()
+
+                if p['bits'] < 1: raise ValueError("The number of bits per variable must be >= 1.")
+                if not (0.0 <= p['inv'] <= 1.0):
+                    raise ValueError("The inversion probability must be in the range [0, 1].")
+
+            # 5. real params
+            if tab_index in [1, 2]:
+                p['cross_real'] = self.view.cross_combo_real.get()
+                p['mut_real'] = self.view.mut_combo_real.get()
+
+                # safeguard dynamic params
+                if "blx" in p['cross_real']:
+                    p['alpha'] = float(self.view.alpha_entry.get())
+                    if p['alpha'] < 0: raise ValueError("The Alpha (BLX) parameter should be >= 0.")
+                else:
+                    p['alpha'] = None
+
+                if "blx_alpha_beta" == p['cross_real']:
+                    p['beta'] = float(self.view.beta_entry.get())
+                    if p['beta'] < 0: raise ValueError("The Beta (BLX) parameter should be >= 0.")
+                else:
+                    p['beta'] = None
+
+                if p['mut_real'] == "gaussian":
+                    p['sigma'] = float(self.view.sigma_entry.get())
+                    if p['sigma'] <= 0: raise ValueError("The Sigma (Gauss) parameter should be > 0.")
+                else:
+                    p['sigma'] = None
+
+            return p
+
+        except ValueError as e:
+            # check for errors
+            error_msg = str(e)
+            if "could not convert" in error_msg or "invalid literal" in error_msg:
+                error_msg = "Make sure all fields contain valid numbers and are not empty."
+            messagebox.showerror("Value Validation Error", f"Launch aborted.\n\n{error_msg}")
+            return None
+
+    def on_run_click(self):
+        active_tab = self.view.notebook.index(self.view.notebook.select())
+
+        # 1. Validation and data fetching from GUI in MAIN THREAD
+        params = self.get_and_validate_params(active_tab)
+
+        # 2. If validation fails, 'params' is None and we abort.
+        if params is None:
             return
 
-        active_tab = self.view.notebook.index(self.view.notebook.select())
+        # 3. Change the view and start the thread with the 'params' dictionary frozen
         self.view.start_button.config(state="disabled", text="Evolution in progress... ⏳")
         self.view.progress_bar["value"] = 0
-        threading.Thread(target=self.execute_ga, args=(active_tab,), daemon=True).start()
+        threading.Thread(target=self.execute_ga, args=(active_tab, params), daemon=True).start()
 
     def update_progress(self, val):
         self.view.progress_bar["value"] = val
@@ -76,7 +164,9 @@ class GeneticAlgorithmController:
                 'best_history': results['best_history'], 'avg_history': results['avg_history'],
                 'execution_time': results['execution_time'],
                 'selection_method': params['sel'], 'crossover_method': params['cross'],
+                'alpha': params['alpha'], 'beta': params['beta'],
                 'mutation_method': params['mut'],
+                'sigma': params['sigma'],
                 'population_size': params['pop'], 'generations': params['gen'], 'dimensions': params['dim'],
                 'bits': params['bits'],
                 'bits_per_variable': params['bits'], 'crossover_rate': params['cr'], 'mutation_rate': params['mr'],
@@ -91,86 +181,72 @@ class GeneticAlgorithmController:
             return f"log_{params['exp_name']}_{ga_type.lower()}.csv"
 
     # --- MAIN LOOP ---
-    def execute_ga(self, tab_index):
+    def execute_ga(self, tab_index, p):
         try:
-            p = {
-                'pop': int(self.view.pop_entry.get()), 'gen': int(self.view.gen_entry.get()),
-                'dim': int(self.view.dim_entry.get()),
-                'cr': float(self.view.cr_entry.get()), 'mr': float(self.view.mr_entry.get()),
-                'lb': float(self.view.lb_entry.get()),
-                'ub': float(self.view.ub_entry.get()), 'opt': self.view.opt_combo.get(),
-                'elite': int(self.view.elite_entry.get()),
-                'sel': self.view.selection_combo.get(), 'bits': int(self.view.bits_entry.get()),
-                'inv': float(self.view.inv_entry.get()),
-                'exp_name': self.view.exp_name_entry.get()
-            }
-
             if tab_index == 0:  # BINARY P1
-                p['cross'] = self.view.cross_combo_bin.get();
-                p['mut'] = self.view.mut_combo_bin.get()
-
                 def cb(c, t):
                     self.root.after(0, lambda: self.update_progress((c / t) * 100))
 
-                raw = run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'], p['sel'], p['cross'],
-                                    p['mut'], p['lb'], p['ub'], p['opt'], p['elite'], p['inv'], cb)
+                raw = run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'], p['sel'],
+                                    p['cross_bin'], p['mut_bin'], p['lb'], p['ub'], p['opt'], p['elite'], p['inv'], cb)
                 res = self.parse_results(raw)
-                filename = self.smart_logger(res, p, "Binary")
+
+                # copy for logger
+                p_log = p.copy()
+                p_log['cross'] = p['cross_bin']
+                p_log['mut'] = p['mut_bin']
+                filename = self.smart_logger(res, p_log, "Binary")
                 self.root.after(0, lambda: self.finalize_single(res, "Binary (P1)", filename))
 
             elif tab_index == 1:  # REAL P2
-                p['cross'] = self.view.cross_combo_real.get();
-                p['mut'] = self.view.mut_combo_real.get()
-
                 def cb(c, t):
                     self.root.after(0, lambda: self.update_progress((c / t) * 100))
 
-                raw = run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'], p['cross'], p['mut'],
-                                  p['lb'], p['ub'], p['opt'], p['elite'], cb)
+                raw = run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'],
+                                  p['cross_real'], p['mut_real'], p['lb'], p['ub'], p['opt'], p['elite'],
+                                  alpha=p['alpha'], beta=p['beta'], sigma=p['sigma'], progress_callback=cb)
                 res = self.parse_results(raw)
-                filename = self.smart_logger(res, p, "Real")
+
+                p_log = p.copy()
+                p_log['cross'] = p['cross_real']
+                p_log['mut'] = p['mut_real']
+                filename = self.smart_logger(res, p_log, "Real")
                 self.root.after(0, lambda: self.finalize_single(res, "Real (P2)", filename))
 
             elif tab_index == 2:  # COMPARISON
-                p_bin = p.copy();
-                p_bin['cross'] = self.view.cross_combo_bin.get();
-                p_bin['mut'] = self.view.mut_combo_bin.get()
-
                 def cb_b(c, t):
                     self.root.after(0, lambda: self.update_progress((c / t) * 50))
 
                 res_bin = self.parse_results(
-                    run_binary_ga(p_bin['pop'], p_bin['gen'], p_bin['dim'], p_bin['bits'], p_bin['cr'], p_bin['mr'],
-                                  p_bin['sel'], p_bin['cross'], p_bin['mut'], p_bin['lb'], p_bin['ub'], p_bin['opt'],
-                                  p_bin['elite'], p_bin['inv'], cb_b))
-
-                p_real = p.copy();
-                p_real['cross'] = self.view.cross_combo_real.get();
-                p_real['mut'] = self.view.mut_combo_real.get()
+                    run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'],
+                                  p['sel'], p['cross_bin'], p['mut_bin'], p['lb'], p['ub'], p['opt'],
+                                  p['elite'], p['inv'], cb_b))
 
                 def cb_r(c, t):
                     self.root.after(0, lambda: self.update_progress(50 + (c / t) * 50))
 
                 res_real = self.parse_results(
-                    run_real_ga(p_real['pop'], p_real['gen'], p_real['dim'], p_real['cr'], p_real['mr'], p_real['sel'],
-                                p_real['cross'], p_real['mut'], p_real['lb'], p_real['ub'], p_real['opt'],
-                                p_real['elite'], cb_r))
+                    run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'],
+                                p['cross_real'], p['mut_real'], p['lb'], p['ub'], p['opt'],
+                                p['elite'], alpha=p['alpha'], beta=p['beta'], sigma=p['sigma'], progress_callback=cb_r))
+
                 self.root.after(0, lambda: self.finalize_comparison(res_bin, res_real))
 
         except Exception as e:
+            import traceback
             traceback.print_exc()
             self.root.after(0, lambda: messagebox.showerror("Execution Error", f"A critical error occurred:\n{str(e)}"))
             self.root.after(0, self.reset_ui)
 
-    # --- RYSOWANIE I ZAKOŃCZENIE ---
+    # --- DRAW CHART ---
     def finalize_single(self, results, ga_type, filename):
         for widget in self.view.plot_panel.winfo_children(): widget.destroy()
         fig = create_convergence_figure(results['best_history'], results['avg_history'])
-        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel);
+        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
         toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
-        toolbar.config(background="#FFFFFF");
+        toolbar.config(background="#FFFFFF")
         toolbar.update()
 
         msg = f"✅ {ga_type} Success! Result: {results['best_value']:.6f} | Time: {results['execution_time']:.3f}s | File: {filename}"
@@ -186,16 +262,16 @@ class GeneticAlgorithmController:
         ax.plot(res_bin['best_history'], label="Binary Encoding (P1)", color="red", linewidth=2)
         ax.plot(res_real['best_history'], label="Real Encoding (P2)", color="blue", linewidth=2, linestyle="--")
         ax.set_title("Convergence Comparison: Binary vs Real", fontsize=12, fontweight='bold')
-        ax.set_xlabel("Generations");
+        ax.set_xlabel("Generations")
         ax.set_ylabel("Best Fitness")
-        ax.legend();
-        ax.grid(True, linestyle=":", alpha=0.7);
+        ax.legend()
+        ax.grid(True, linestyle=":", alpha=0.7)
         fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel);
+        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
-        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel);
+        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
         toolbar.update()
 
         msg = f"✅ Comparison finished! Value difference: {abs(res_bin['best_value'] - res_real['best_value']):.6f}"
