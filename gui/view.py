@@ -21,6 +21,9 @@ class MainView:
         self.plot_panel = None
         self.main_container = None
         self.status_label = None
+        self.console_label = None
+        self.console_frame = None
+        self.results_console = None
 
         self.setup_ui()
 
@@ -28,12 +31,12 @@ class MainView:
         self.main_container = tk.Frame(self.root, bg=COLORS["bg_main"])
         self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # LEWY PANEL
+        # LEFT PANEL
         self.sidebar = tk.Frame(self.main_container, bg=COLORS["bg_panel"], width=420)
         self.sidebar.pack(side="left", fill="y", padx=(0, 20))
         self.sidebar.pack_propagate(False)
 
-        # GLOBALNA NAZWA EKSPERYMENTU
+        # EXPERIMENT NAME
         exp_frame = tk.Frame(self.sidebar, bg=COLORS["bg_panel"])
         exp_frame.pack(fill="x", padx=15, pady=(15, 5))
         tk.Label(exp_frame, text="Experiment:", bg=COLORS["bg_panel"], font=FONTS["header"], fg=COLORS["accent"]).pack(
@@ -42,7 +45,7 @@ class MainView:
         self.exp_name_entry.insert(0, "Hypersphere_Test")
         self.exp_name_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
-        # ZAKŁADKI (TABS)
+        # TABS
         self.notebook = ttk.Notebook(self.sidebar)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(5, 10))
 
@@ -58,7 +61,7 @@ class MainView:
         self.setup_real_tab()
         self.setup_comparison_tab()
 
-        # WSPÓLNE PARAMETRY
+        # SHARED PARAMS
         self.setup_shared_parameters()
 
         # START & PROGRESS
@@ -69,10 +72,31 @@ class MainView:
         self.progress_bar = ttk.Progressbar(self.sidebar, style="SGA.Horizontal.TProgressbar", mode="determinate")
         self.progress_bar.pack(fill="x", padx=20, pady=5)
 
-        # PRAWY PANEL (WYKRESY)
-        self.plot_panel = tk.Frame(self.main_container, bg="white")
-        self.plot_panel.pack(side="right", fill="both", expand=True)
+        # RIGHT FRAME
+        self.right_area = tk.Frame(self.main_container, bg="white")
+        self.right_area.pack(side="right", fill="both", expand=True)
 
+        # RESULTS
+        self.console_frame = tk.Frame(self.right_area, bg=COLORS.get("bg_panel", "white"))
+        self.console_frame.pack(side="bottom", fill="x", padx=10, pady=10)
+
+        self.console_label = tk.Label(self.console_frame, text="Final Results:",
+                                      font=FONTS.get("header", ("Arial", 11, "bold")),
+                                      bg=COLORS.get("bg_panel", "white"))
+        self.console_label.pack(anchor="w")
+
+        self.results_console = tk.Text(self.console_frame, height=7, wrap="word",
+                                       font=FONTS.get("body", ("Consolas", 10)),
+                                       relief="solid", bd=1, bg="#f9f9f9")
+        self.results_console.pack(fill="x", pady=(5, 0))
+        self.results_console.insert("1.0", "Run the evolution to see the results...")
+        self.results_console.config(state="disabled")
+
+        # 2. PLOT
+        self.plot_panel = tk.Frame(self.right_area, bg="white")
+        self.plot_panel.pack(side="top", fill="both", expand=True)
+
+        # 3. STATUS LABEL
         self.status_label = tk.Label(self.root, text="Ready. Select parameters and run.",
                                      anchor="w", bg=COLORS["bg_main"], fg=COLORS["text_muted"], font=FONTS["body"])
         self.status_label.pack(side="bottom", fill="x", padx=20, pady=5)
@@ -168,17 +192,35 @@ class MainView:
             self.gauss_frame.pack_forget()
 
     def setup_comparison_tab(self):
-        tk.Label(self.tab_compare, text="Algorithm Comparison 🏆", font=FONTS["title"], bg=COLORS["bg_panel"],
-                 fg=COLORS["accent"]).pack(pady=(20, 10))
-        tk.Label(self.tab_compare, text="Runs both variants sequentially\nand plots a shared convergence curve.",
-                 bg=COLORS["bg_panel"], font=FONTS["body"]).pack(pady=10)
-        self.stats_frame = tk.Frame(self.tab_compare, bg=COLORS["bg_main"], relief="solid", bd=1)
-        self.stats_frame.pack(fill="x", padx=20, pady=20)
-        self.bin_time_label = tk.Label(self.stats_frame, text="Binary Time: -", bg=COLORS["bg_main"],
-                                       font=FONTS["mono"])
-        self.bin_time_label.pack(anchor="w", padx=10, pady=(10, 2))
-        self.real_time_label = tk.Label(self.stats_frame, text="Real Time: -", bg=COLORS["bg_main"], font=FONTS["mono"])
-        self.real_time_label.pack(anchor="w", padx=10, pady=(2, 10))
+        """Sets up the Matchup Board in the Comparison tab."""
+
+        self.matchup_container = tk.Frame(self.tab_compare, bg=COLORS["bg_panel"])
+        self.matchup_container.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Header
+        tk.Label(self.matchup_container, text="⚔️ MATCHUP SUMMARY",
+                 font=FONTS.get("header", ("Arial", 12, "bold")),
+                 bg=COLORS["bg_panel"], fg=COLORS["accent"]).pack(pady=(0, 15))
+
+        self.matchup_info = tk.Text(
+            self.matchup_container,
+            height=10,
+            font=("Consolas", 9),
+            bg="#f0f0f0",
+            fg=COLORS["text_main"],
+            relief="flat",
+            padx=10, pady=10
+        )
+        self.matchup_info.pack(fill="both", expand=True)
+        self.matchup_info.insert("1.0", "Select Comparison tab to refresh data...")
+        self.matchup_info.config(state="disabled")
+
+        tk.Label(
+            self.matchup_container,
+            text="* Settings gathered from other tabs",
+            font=("Arial", 7, "italic"),
+            bg=COLORS["bg_panel"], fg=COLORS["text_muted"]
+        ).pack(side="bottom", pady=2)
 
     def setup_shared_parameters(self):
         shared_frame = tk.LabelFrame(self.sidebar, text="Shared Parameters", bg=COLORS["bg_panel"],

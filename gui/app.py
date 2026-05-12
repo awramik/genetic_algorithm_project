@@ -36,96 +36,182 @@ class GeneticAlgorithmController:
 
     # --- UI EVENTS ---
     def on_tab_change(self, event):
-        for widget in self.view.plot_panel.winfo_children():
-            widget.destroy()
-        self.view.status_label.config(text="Mode changed. Ready for computation.", fg=COLORS["text_muted"])
+        """Handles logic when the user switches tabs."""
+        active_tab = self.view.notebook.index(self.view.notebook.select())
+
+        # 1. Reset progress bar
+        self.view.progress_bar["value"] = 0
+
+        # 2. Reset status label
+        self.view.status_label.config(text="Ready. Select parameters and run.")
+
+        # 3. CLEAR RESULTS CONSOLE (UX Improvement)
+        self.view.results_console.config(state="normal")
+        self.view.results_console.delete("1.0", tk.END)
+        self.view.results_console.insert("1.0", "Run the evolution to see the results...")
+        self.view.results_console.config(state="disabled")
+
+        # 4. Dynamic Matchup Board Update (for Comparison Tab)
+        if active_tab == 2:  # Comparison Tab
+            self.update_matchup_board()
+
+        # 5. Trigger visibility update for Real/Binary params
+        self.view.update_visibility()
+
+    def update_matchup_board(self):
+        """Gathers current settings and updates the Matchup Board display."""
+        # Gather Binary settings
+        b_cross = self.view.cross_combo_bin.get()
+        b_mut = self.view.mut_combo_bin.get()
+        b_bits = self.view.bits_entry.get()
+
+        # Gather Real settings
+        r_cross = self.view.cross_combo_real.get()
+        r_mut = self.view.mut_combo_real.get()
+
+        # Build Binary string
+        binary_part = f"[01] BINARY ALGORITHM:\n" \
+                      f"   Crossover: {b_cross}\n" \
+                      f"   Mutation:  {b_mut} ({b_bits} bits)\n\n"
+
+        vs_part = f"            VS\n\n"
+
+        # Build Real string with dynamic params
+        real_part = f"[ℝ] REAL ALGORITHM:\n" \
+                    f"   Crossover: {r_cross}\n"
+
+        # BLX param
+        if "blx" in r_cross:
+            alpha = self.view.alpha_entry.get()
+            if r_cross == "blx_alpha_beta":
+                beta = self.view.beta_entry.get()
+                real_part += f"   (α={alpha}, β={beta})\n"
+            else:
+                real_part += f"   (α={alpha})\n"
+
+        real_part += f"   Mutation:  {r_mut}"
+        if r_mut == "gaussian":
+            real_part += f" (σ={self.view.sigma_entry.get()})"
+
+        full_text = f"{binary_part}{vs_part}{real_part}"
+
+        # Combine everything
+        self.view.matchup_info.config(state="normal")
+        self.view.matchup_info.delete("1.0", tk.END)
+        self.view.matchup_info.insert("1.0", full_text)
+        self.view.matchup_info.config(state="disabled")
 
     def get_and_validate_params(self, tab_index):
-        """Validation of the params"""
-        try:
-            # 1. shared params
-            p = {
-                'pop': int(self.view.pop_entry.get()),
-                'gen': int(self.view.gen_entry.get()),
-                'dim': int(self.view.dim_entry.get()),
-                'cr': float(self.view.cr_entry.get()),
-                'mr': float(self.view.mr_entry.get()),
-                'lb': float(self.view.lb_entry.get()),
-                'ub': float(self.view.ub_entry.get()),
-                'opt': self.view.opt_combo.get(),
-                'elite': int(self.view.elite_entry.get()),
-                'sel': self.view.selection_combo.get(),
-                'exp_name': self.view.exp_name_entry.get()
-            }
+        """Fetches, converts, and validates GUI parameters with error aggregation and highlighting."""
 
-            # 2. validation of shared params
-            if p['pop'] < 2: raise ValueError("Population size must be at least 2.")
-            if p['gen'] < 1: raise ValueError("The number of generations must be at least 1.")
-            if p['dim'] < 1: raise ValueError("The number of dimensions must be at least 1.")
+        errors = []
+        p = {}
 
-            if not (0.0 <= p['cr'] <= 1.0):
-                raise ValueError("The crossover probability must be in the range [0, 1].")
+        # --- HELPER FUNCTION FOR VISUAL VALIDATION ---
+        def validate_field(entry, field_name, cast_type, min_val=None, max_val=None):
+            # 1. Reset background to default
+            entry.config(bg=COLORS.get("entry_bg", "white"))
+            raw_value = entry.get().strip()
 
-            if not (0.0 <= p['mr'] <= 1.0):
-                raise ValueError("The mutation probability (MR) must be in the range [0, 1].")
+            # 2. Check if field is empty
+            if not raw_value:
+                errors.append(f"{field_name}: field cannot be empty.")
+                entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
+                return None
 
-            if p['lb'] >= p['ub']:
-                raise ValueError("The lower bound (LB) must be less than the upper bound (UB)")
-
-            if p['elite'] < 0 or p['elite'] >= p['pop']:
-                raise ValueError("The size of the elite must be >= 0 and smaller than the total population.")
-
-            # 3. hypersphere domain
-            if p['lb'] < -5.0 or p['ub'] > 5.0:
-                proceed = messagebox.askyesno("Note on Domain",
-                                              "The recommended domain for a Hypersphere function is [-5.0, 5.0].\nAre you sure you want to continue?")
-                if not proceed:
+            # 3. Conversion and boundary checks
+            try:
+                val = cast_type(raw_value)
+                if min_val is not None and val < min_val:
+                    errors.append(f"{field_name}: value must be at least {min_val}.")
+                    entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
                     return None
+                if max_val is not None and val > max_val:
+                    errors.append(f"{field_name}: value cannot exceed {max_val}.")
+                    entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
+                    return None
+                return val
+            except ValueError:
+                errors.append(f"{field_name}: invalid format (expected a number).")
+                entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
+                return None
 
-            # 4. binary params
-            if tab_index in [0, 2]:
-                p['bits'] = int(self.view.bits_entry.get())
-                p['inv'] = float(self.view.inv_entry.get())
-                p['cross_bin'] = self.view.cross_combo_bin.get()
-                p['mut_bin'] = self.view.mut_combo_bin.get()
+        # === 1. SHARED PARAMETERS ===
+        p['pop'] = validate_field(self.view.pop_entry, "Population size", int, min_val=2)
+        p['gen'] = validate_field(self.view.gen_entry, "Generations", int, min_val=1)
+        p['dim'] = validate_field(self.view.dim_entry, "Dimensions", int, min_val=1)
+        p['cr'] = validate_field(self.view.cr_entry, "Crossover rate (CR)", float, min_val=0.0, max_val=1.0)
+        p['mr'] = validate_field(self.view.mr_entry, "Mutation rate (MR)", float, min_val=0.0, max_val=1.0)
+        p['lb'] = validate_field(self.view.lb_entry, "Lower bound (LB)", float)
+        p['ub'] = validate_field(self.view.ub_entry, "Upper bound (UB)", float)
+        p['elite'] = validate_field(self.view.elite_entry, "Elite size", int, min_val=0)
 
-                if p['bits'] < 1: raise ValueError("The number of bits per variable must be >= 1.")
-                if not (0.0 <= p['inv'] <= 1.0):
-                    raise ValueError("The inversion probability must be in the range [0, 1].")
+        # Text fields / Dropdowns
+        p['opt'] = self.view.opt_combo.get()
+        p['sel'] = self.view.selection_combo.get()
 
-            # 5. real params
-            if tab_index in [1, 2]:
-                p['cross_real'] = self.view.cross_combo_real.get()
-                p['mut_real'] = self.view.mut_combo_real.get()
+        self.view.exp_name_entry.config(bg=COLORS.get("entry_bg", "white"))
+        p['exp_name'] = self.view.exp_name_entry.get().strip()
+        if not p['exp_name']:
+            errors.append("Experiment name: field cannot be empty.")
+            self.view.exp_name_entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
 
-                # safeguard dynamic params
-                if "blx" in p['cross_real']:
-                    p['alpha'] = float(self.view.alpha_entry.get())
-                    if p['alpha'] < 0: raise ValueError("The Alpha (BLX) parameter should be >= 0.")
-                else:
-                    p['alpha'] = None
+        # === DEPENDENCY CHECKS ===
+        if p['lb'] is not None and p['ub'] is not None and p['lb'] >= p['ub']:
+            errors.append("Bounds: Lower bound must be strictly less than upper bound.")
+            self.view.lb_entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
+            self.view.ub_entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
 
-                if "blx_alpha_beta" == p['cross_real']:
-                    p['beta'] = float(self.view.beta_entry.get())
-                    if p['beta'] < 0: raise ValueError("The Beta (BLX) parameter should be >= 0.")
-                else:
-                    p['beta'] = None
+        if p['elite'] is not None and p['pop'] is not None and p['elite'] >= p['pop']:
+            errors.append("Elite size: must be smaller than total population size.")
+            self.view.elite_entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
 
-                if p['mut_real'] == "gaussian":
-                    p['sigma'] = float(self.view.sigma_entry.get())
-                    if p['sigma'] <= 0: raise ValueError("The Sigma (Gauss) parameter should be > 0.")
-                else:
-                    p['sigma'] = None
+        # === 2. BINARY ALGORITHM PARAMS (Tabs 0 & 2) ===
+        if tab_index in [0, 2]:
+            p['bits'] = validate_field(self.view.bits_entry, "Bits per variable", int, min_val=1)
+            p['inv'] = validate_field(self.view.inv_entry, "Inversion rate", float, min_val=0.0, max_val=1.0)
+            p['cross_bin'] = self.view.cross_combo_bin.get()
+            p['mut_bin'] = self.view.mut_combo_bin.get()
 
-            return p
+        # === 3. REAL ALGORITHM PARAMS (Tabs 1 & 2) ===
+        if tab_index in [1, 2]:
+            p['cross_real'] = self.view.cross_combo_real.get()
+            p['mut_real'] = self.view.mut_combo_real.get()
 
-        except ValueError as e:
-            # check for errors
-            error_msg = str(e)
-            if "could not convert" in error_msg or "invalid literal" in error_msg:
-                error_msg = "Make sure all fields contain valid numbers and are not empty."
-            messagebox.showerror("Value Validation Error", f"Launch aborted.\n\n{error_msg}")
+            if "blx" in p['cross_real']:
+                p['alpha'] = validate_field(self.view.alpha_entry, "Alpha (BLX)", float, min_val=0.0)
+            else:
+                p['alpha'] = None
+
+            if p['cross_real'] == "blx_alpha_beta":
+                p['beta'] = validate_field(self.view.beta_entry, "Beta (BLX)", float, min_val=0.0)
+            else:
+                p['beta'] = None
+
+            if p['mut_real'] == "gaussian":
+                p['sigma'] = validate_field(self.view.sigma_entry, "Sigma (Gauss)", float, min_val=0.0001)
+            else:
+                p['sigma'] = None
+
+        # === 4. FINAL VERIFICATION & ERROR DISPLAY ===
+        if errors:
+            error_list = "\n".join([f"• {e}" for e in errors])
+            messagebox.showerror(
+                "Validation Error",
+                f"Cannot start the algorithm. Please correct the highlighted fields:\n\n{error_list}"
+            )
             return None
+
+        # === DOMAIN WARNING ===
+        if p['lb'] < -5.0 or p['ub'] > 5.0:
+            proceed = messagebox.askyesno(
+                "Domain Warning",
+                "The recommended domain for the Hypersphere function is [-5.0, 5.0].\nAre you sure you want to proceed with the current bounds?"
+            )
+            if not proceed:
+                return None
+
+        return p
 
     def on_run_click(self):
         active_tab = self.view.notebook.index(self.view.notebook.select())
@@ -146,21 +232,23 @@ class GeneticAlgorithmController:
         self.view.progress_bar["value"] = val
 
     # --- HELPERS ---
-    def parse_results(self, raw_data):
-        if isinstance(raw_data, dict):
-            return {'best_history': raw_data['best_history'], 'avg_history': raw_data['avg_history'],
-                    'execution_time': raw_data['execution_time'], 'best_value': raw_data.get('best_value',
-                                                                                             raw_data['best_history'][
-                                                                                                 -1] if raw_data[
-                                                                                                 'best_history'] else 0)}
-        elif isinstance(raw_data, tuple):
-            return {'best_history': raw_data[0], 'avg_history': raw_data[1], 'execution_time': raw_data[2],
-                    'best_value': raw_data[0][-1] if raw_data[0] else 0}
-        return raw_data
+    def parse_results(self, raw):
+        """Standardizes results into a dictionary format."""
+        if isinstance(raw, dict):
+            return raw
+
+        return {
+            "best_history": raw[0],
+            "avg_history": raw[1],
+            "execution_time": raw[2],
+            "best_value": raw[0][-1] if raw[0] else 0,
+            "best_individual": "No individual data"
+        }
 
     def smart_logger(self, results, params, ga_type):
         try:
             pool = {
+                'best_individual': results.get('best_individual'),
                 'best_history': results['best_history'],
                 'avg_history': results['avg_history'],
                 'execution_time': results['execution_time'],
@@ -258,43 +346,122 @@ class GeneticAlgorithmController:
 
     # --- DRAW CHART ---
     def finalize_single(self, results, ga_type, filename):
-        for widget in self.view.plot_panel.winfo_children(): widget.destroy()
-        fig = create_convergence_figure(results['best_history'], results['avg_history'])
-        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
-        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
-        toolbar.config(background="#FFFFFF")
-        toolbar.update()
+        try:
+            for widget in self.view.plot_panel.winfo_children():
+                widget.destroy()
+            fig = create_convergence_figure(results['best_history'], results['avg_history'])
+            canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True)
+            toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
+            toolbar.config(background="#FFFFFF")
+            toolbar.update()
 
-        msg = f"✅ {ga_type} Success! Result: {results['best_value']:.6f} | Time: {results['execution_time']:.3f}s | File: {filename}"
-        self.view.status_label.config(text=msg, fg=COLORS["success"])
-        self.reset_ui()
+            # === RESULTS CONSOLE ===
+            self.view.results_console.config(state="normal")
+            self.view.results_console.delete("1.0", tk.END)
+
+            best_val = results['best_value']
+            chrom = results.get('best_individual', "No chromosome data available")
+            time_exec = results['execution_time']
+
+            # difference between first and last gen
+            improvement = abs(results['best_history'][0] - best_val)
+
+            # chromosome formatting (4 dec places)
+            if isinstance(chrom, list) and len(chrom) > 0 and isinstance(chrom[0], float):
+                chrom_str = ", ".join([f"{x:.4f}" for x in chrom])
+            else:
+                chrom_str = str(chrom)
+
+            msg = f"🏆 Best Value (Fitness): {best_val:.6f}\n"
+            msg += f"📉 Total Improvement: {improvement:.6f}\n"
+            msg += f"⏱ Execution Time: {time_exec:.3f} s \n"
+            msg += f"📁 Logs: {filename}\n"
+            msg += f"🧬 Winning Chromosome (Solution):\n[{chrom_str}]\n"
+
+            self.view.results_console.insert(tk.END, msg)
+            self.view.results_console.config(state="disabled")
+
+            status_msg = f"✅ {ga_type} Success! Result: {results['best_value']:.6f} | Time: {results['execution_time']:.3f}s | File: {filename}"
+            self.view.status_label.config(text=status_msg, fg=COLORS["success"])
+
+        except Exception as e:
+            print(f"Error in finalize_single: {e}")
+            import traceback
+            traceback.print_exc()
+
+        finally:
+            # Reset UI
+            self.view.start_button.config(state="normal", text="START EVOLUTION")
+            self.view.progress_bar["value"] = 100
+            self.reset_ui()
+
+            self.root.after(1500, lambda: self.view.progress_bar.configure(value=0))
 
     def finalize_comparison(self, res_bin, res_real):
-        self.view.bin_time_label.config(text=f"Binary Time: {res_bin['execution_time']:.4f} s")
-        self.view.real_time_label.config(text=f"Real Time: {res_real['execution_time']:.4f} s")
-        for widget in self.view.plot_panel.winfo_children(): widget.destroy()
+        try:
+            for widget in self.view.plot_panel.winfo_children():
+                widget.destroy()
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(res_bin['best_history'], label="Binary Encoding (P1)", color="red", linewidth=2)
-        ax.plot(res_real['best_history'], label="Real Encoding (P2)", color="blue", linewidth=2, linestyle="--")
-        ax.set_title("Convergence Comparison: Binary vs Real", fontsize=12, fontweight='bold')
-        ax.set_xlabel("Generations")
-        ax.set_ylabel("Best Fitness")
-        ax.legend()
-        ax.grid(True, linestyle=":", alpha=0.7)
-        fig.tight_layout()
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.plot(res_bin['best_history'], label="Binary Encoding (P1)", color="red", linewidth=2)
+            ax.plot(res_real['best_history'], label="Real Encoding (P2)", color="blue", linewidth=2, linestyle="--")
+            ax.set_title("Convergence Comparison: Binary vs Real", fontsize=12, fontweight='bold')
+            ax.set_xlabel("Generations")
+            ax.set_ylabel("Best Fitness")
+            ax.legend()
+            ax.grid(True, linestyle=":", alpha=0.7)
+            fig.tight_layout()
 
-        canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
-        toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
-        toolbar.update()
+            canvas = FigureCanvasTkAgg(fig, master=self.view.plot_panel)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="both", expand=True)
+            toolbar = NavigationToolbar2Tk(canvas, self.view.plot_panel)
+            toolbar.update()
 
-        msg = f"✅ Comparison finished! Value difference: {abs(res_bin['best_value'] - res_real['best_value']):.6f}"
-        self.view.status_label.config(text=msg, fg=COLORS["success"])
-        self.reset_ui()
+            # === FILLING THE RESULTS CONSOLE FOR COMPARISON ===
+            self.view.results_console.config(state="normal")
+            self.view.results_console.delete("1.0", tk.END)
+
+            def format_chrom(chrom):
+                if chrom is None or isinstance(chrom, str):
+                    return str(chrom)
+                if isinstance(chrom, list) and len(chrom) > 0 and isinstance(chrom[0], float):
+                    return ", ".join([f"{x:.4f}" for x in chrom])
+                return str(chrom)
+
+            msg = "💻 BINARY ALGORITHM:\n"
+            msg += f"   Value: {res_bin.get('best_value', 0):.6f}  |  Time: {res_bin.get('execution_time', 0):.2f} s\n"
+            msg += f"   Chromosome: [{format_chrom(res_bin.get('best_individual', 'No data'))}]\n"
+
+            msg += "📈 REAL-CODED ALGORITHM:\n"
+            msg += f"   Value: {res_real.get('best_value', 0):.6f}  |  Time: {res_real.get('execution_time', 0):.2f} s\n"
+            msg += f"   Chromosome: [{format_chrom(res_real.get('best_individual', 'No data'))}]\n"
+
+            self.view.results_console.insert(tk.END, msg)
+            self.view.results_console.config(state="disabled")
+
+            diff = abs(res_bin.get('best_value', 0) - res_real.get('best_value', 0))
+            status_msg = f"✅ Comparison finished! Value difference: {diff:.6f}"
+            self.view.status_label.config(text=status_msg, fg=COLORS["success"])
+
+        except Exception as e:
+            print(f"Error in finalize_comparison: {e}")
+            import traceback
+            traceback.print_exc()
+
+        finally:
+            # Reset UI
+            self.view.start_button.config(state="normal", text="START EVOLUTION")
+            self.view.progress_bar["value"] = 100
+            self.reset_ui()
+
+            def clear_bar():
+                self.view.progress_bar["value"] = 0
+                self.view.progress_bar.update_idletasks()
+
+            self.root.after(1500, clear_bar)
 
     def reset_ui(self):
         self.view.start_button.config(state="normal", text="START EVOLUTION 🧬")

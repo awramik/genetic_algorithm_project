@@ -24,7 +24,8 @@ def save_results(
         inversion_rate=None,
         alpha=None,
         beta=None,
-        sigma=None
+        sigma=None,
+        best_individual=None
 ):
     os.makedirs("results/logs", exist_ok=True)
     timestamp = datetime.now().strftime("%H-%M-%S")
@@ -70,6 +71,12 @@ def save_results(
 
         file.write("\n=== RESULTS ===\n")
         file.write(f"Best found value: {best_history[-1]:.6f}\n")
+        if best_individual is not None:
+            if isinstance(best_individual, list) and len(best_individual) > 0 and isinstance(best_individual[0], float):
+                chrom_str = ", ".join([f"{x:.6f}" for x in best_individual])
+            else:
+                chrom_str = str(best_individual)
+            file.write(f"The winning chromosome: [{chrom_str}]\n")
         file.write(f"Execution time: {execution_time:.4f} s\n")
 
     # 2. CSV file

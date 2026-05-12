@@ -9,7 +9,9 @@ COLORS = {
     "text_muted": "#64748B",  # Gray for hints
     "success": "#059669",  # Emerald green for status
     "error": "#DC2626",  # Red for errors
-    "border": "#E2E8F0"  # Soft gray for dividers
+    "border": "#E2E8F0",  # Soft gray for dividers
+    "error_bg": "#ffcccc",  # light red
+    "entry_bg": "#ffffff",  # white
 }
 
 FONTS = {

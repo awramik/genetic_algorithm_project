@@ -132,4 +132,14 @@ def run_genetic_algorithm(
 
     execution_time = time.time() - start_time
 
-    return best_history, avg_history, execution_time
+    final_eval = evaluate_population(population, dimensions, lower_bound, upper_bound, optimization_type)
+
+    best_final = max(final_eval, key=lambda x: x["fitness"])
+
+    return {
+        "best_individual": best_final["chromosome"],
+        "best_value": best_final["value"],
+        "best_history": best_history,
+        "avg_history": avg_history,
+        "execution_time": execution_time
+    }
