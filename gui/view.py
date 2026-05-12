@@ -1,104 +1,79 @@
-import tkinter as tk
-from tkinter import ttk
-from gui.styles import COLORS, FONTS
-
+import customtkinter as ctk
 
 class MainView:
     def __init__(self, root):
         self.root = root
-
-        self.main_container = None
-        self.sidebar = None
-        self.exp_name_entry = None
-        self.cross_combo_real = None
-        self.alpha_entry = None
-        self.notebook = None
-        self.tab_binary = None
-        self.tab_real = None
-        self.tab_compare = None
-        self.start_button = None
-        self.progress_bar = None
-        self.plot_panel = None
-        self.main_container = None
-        self.status_label = None
-        self.console_label = None
-        self.console_frame = None
-        self.results_console = None
-
         self.setup_ui()
 
     def setup_ui(self):
-        self.main_container = tk.Frame(self.root, bg=COLORS["bg_main"])
+        # Main container
+        self.main_container = ctk.CTkFrame(self.root, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # LEFT PANEL
-        self.sidebar = tk.Frame(self.main_container, bg=COLORS["bg_panel"], width=420)
+        # === LEFT PANEL (Sidebar) ===
+        self.sidebar = ctk.CTkFrame(self.main_container, width=420)
         self.sidebar.pack(side="left", fill="y", padx=(0, 20))
         self.sidebar.pack_propagate(False)
 
-        # EXPERIMENT NAME
-        exp_frame = tk.Frame(self.sidebar, bg=COLORS["bg_panel"])
+        # Experiment
+        exp_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         exp_frame.pack(fill="x", padx=15, pady=(15, 5))
-        tk.Label(exp_frame, text="Experiment:", bg=COLORS["bg_panel"], font=FONTS["header"], fg=COLORS["accent"]).pack(
-            side="left")
-        self.exp_name_entry = tk.Entry(exp_frame, font=FONTS["body"], relief="solid", bd=1)
+        ctk.CTkLabel(exp_frame, text="Experiment:", font=ctk.CTkFont(weight="bold")).pack(side="left")
+        self.exp_name_entry = ctk.CTkEntry(exp_frame)
         self.exp_name_entry.insert(0, "Hypersphere_Test")
         self.exp_name_entry.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
-        # TABS
-        self.notebook = ttk.Notebook(self.sidebar)
+        # Tabview
+        self.notebook = ctk.CTkTabview(self.sidebar)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=(5, 10))
 
-        self.tab_binary = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
-        self.tab_real = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
-        self.tab_compare = tk.Frame(self.notebook, bg=COLORS["bg_panel"])
-
-        self.notebook.add(self.tab_binary, text="Binary (P1)")
-        self.notebook.add(self.tab_real, text="Real (P2)")
-        self.notebook.add(self.tab_compare, text="Comparison")
+        self.tab_binary = self.notebook.add("Binary (P1)")
+        self.tab_real = self.notebook.add("Real (P2)")
+        self.tab_compare = self.notebook.add("Comparison")
 
         self.setup_binary_tab()
         self.setup_real_tab()
         self.setup_comparison_tab()
 
-        # SHARED PARAMS
+        # SHARED PARAMETERS
         self.setup_shared_parameters()
 
-        # START & PROGRESS
-        self.start_button = tk.Button(self.sidebar, text="START EVOLUTION 🧬",
-                                      bg=COLORS["accent"], fg="white", font=FONTS["button"], pady=12, cursor="hand2")
+        # START & PROGRESS BAR
+        self.start_button = ctk.CTkButton(self.sidebar, text="START EVOLUTION 🧬", font=ctk.CTkFont(weight="bold", size=14), height=45)
         self.start_button.pack(fill="x", padx=20, pady=10)
 
-        self.progress_bar = ttk.Progressbar(self.sidebar, style="SGA.Horizontal.TProgressbar", mode="determinate")
-        self.progress_bar.pack(fill="x", padx=20, pady=5)
+        self.progress_bar = ctk.CTkProgressBar(self.sidebar)
+        self.progress_bar.pack(fill="x", padx=20, pady=10)
+        self.progress_bar.set(0)
 
-        # RIGHT FRAME
-        self.right_area = tk.Frame(self.main_container, bg="white")
+        # === RIGHT PANEL ===
+        self.right_area = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.right_area.pack(side="right", fill="both", expand=True)
 
-        # RESULTS
-        self.console_frame = tk.Frame(self.right_area, bg=COLORS.get("bg_panel", "white"))
-        self.console_frame.pack(side="bottom", fill="x", padx=10, pady=10)
+        # RESULTS CONSOLE
+        self.console_frame = ctk.CTkFrame(self.right_area)
+        self.console_frame.pack(side="bottom", fill="x", pady=(15, 0))
 
-        self.console_label = tk.Label(self.console_frame, text="Final Results:",
-                                      font=FONTS.get("header", ("Arial", 11, "bold")),
-                                      bg=COLORS.get("bg_panel", "white"))
-        self.console_label.pack(anchor="w")
+        self.console_label = ctk.CTkLabel(self.console_frame, text="📊 FINAL RESULTS",
+                                          font=ctk.CTkFont(weight="bold", size=14))
+        self.console_label.pack(anchor="w", padx=10, pady=(5, 0))
 
-        self.results_console = tk.Text(self.console_frame, height=7, wrap="word",
-                                       font=FONTS.get("body", ("Consolas", 10)),
-                                       relief="solid", bd=1, bg="#f9f9f9")
-        self.results_console.pack(fill="x", pady=(5, 0))
+        self.results_console = ctk.CTkTextbox(
+            self.console_frame,
+            height=150,
+            font=ctk.CTkFont("Consolas", 14),
+            activate_scrollbars=True
+        )
+        self.results_console.pack(fill="x", padx=10, pady=(0, 10))
         self.results_console.insert("1.0", "Run the evolution to see the results...")
-        self.results_console.config(state="disabled")
+        self.results_console.configure(state="disabled")
 
-        # 2. PLOT
-        self.plot_panel = tk.Frame(self.right_area, bg="white")
+        # PLOT PANEL
+        self.plot_panel = ctk.CTkFrame(self.right_area, fg_color="#B5C7BC", corner_radius=10)
         self.plot_panel.pack(side="top", fill="both", expand=True)
 
-        # 3. STATUS LABEL
-        self.status_label = tk.Label(self.root, text="Ready. Select parameters and run.",
-                                     anchor="w", bg=COLORS["bg_main"], fg=COLORS["text_muted"], font=FONTS["body"])
+        # BOTTOM STATUS
+        self.status_label = ctk.CTkLabel(self.root, text="Ready. Select parameters and run.", text_color="gray", font=ctk.CTkFont(size=13))
         self.status_label.pack(side="bottom", fill="x", padx=20, pady=5)
 
     def setup_binary_tab(self):
@@ -109,168 +84,167 @@ class MainView:
         self.inv_entry = self.add_entry(self.tab_binary, "0.05")
 
         self.add_label(self.tab_binary, "Crossover Method:")
-        self.cross_combo_bin = ttk.Combobox(self.tab_binary, values=["One-Point", "Two-Point", "Uniform", "Grainy"],
-                                            state="readonly")
+        self.cross_combo_bin = ctk.CTkOptionMenu(self.tab_binary, values=["One-Point", "Two-Point", "Uniform", "Grainy"])
         self.cross_combo_bin.set("One-Point")
         self.cross_combo_bin.pack(fill="x", padx=20, pady=5)
 
         self.add_label(self.tab_binary, "Mutation Method:")
-        self.mut_combo_bin = ttk.Combobox(self.tab_binary, values=["Bit-Flip", "Boundary", "Single-Point", "Two-Point"],
-                                          state="readonly")
+        self.mut_combo_bin = ctk.CTkOptionMenu(self.tab_binary, values=["Bit-Flip", "Boundary", "Single-Point", "Two-Point"])
         self.mut_combo_bin.set("Bit-Flip")
         self.mut_combo_bin.pack(fill="x", padx=20, pady=5)
 
     def setup_real_tab(self):
-        # --- CROSSOVER ---
-        self.cross_sect = tk.Frame(self.tab_real, bg=COLORS["bg_panel"])
+        self.cross_sect = ctk.CTkFrame(self.tab_real, fg_color="transparent")
         self.cross_sect.pack(fill="x", pady=5)
 
         self.add_label(self.cross_sect, "Crossover Method:")
-        self.cross_combo_real = ttk.Combobox(
-            self.cross_sect,
-            values=["Arithmetic", "Linear", "BLX-\u03b1", "BLX-\u03b1-\u03b2", "Averaging"],
-            state="readonly"
-        )
+        self.cross_combo_real = ctk.CTkOptionMenu(self.cross_sect, values=["Arithmetic", "Linear", "BLX-α", "BLX-α-β", "Averaging"], command=self.update_visibility)
         self.cross_combo_real.set("Arithmetic")
         self.cross_combo_real.pack(fill="x", padx=20, pady=5)
 
-        # BLX (Alfa, Beta)
-        self.blx_frame = tk.Frame(self.cross_sect, bg=COLORS["bg_panel"])
-
-        self.alpha_label = tk.Label(self.blx_frame, text="BLX Alpha (\u03b1):", font=FONTS["header"],
-                                    bg=COLORS["bg_panel"], fg=COLORS["text_main"])
-        self.alpha_entry = tk.Entry(self.blx_frame, font=FONTS["body"], relief="solid", bd=1)
+        # BLX
+        self.blx_frame = ctk.CTkFrame(self.cross_sect, fg_color="transparent")
+        self.alpha_label = ctk.CTkLabel(self.blx_frame, text="BLX Alpha (α):", font=ctk.CTkFont(weight="bold"))
+        self.alpha_entry = ctk.CTkEntry(self.blx_frame)
         self.alpha_entry.insert(0, "0.5")
 
-        self.beta_label = tk.Label(self.blx_frame, text="BLX Beta (\u03b2):", font=FONTS["header"],
-                                   bg=COLORS["bg_panel"], fg=COLORS["text_main"])
-        self.beta_entry = tk.Entry(self.blx_frame, font=FONTS["body"], relief="solid", bd=1)
+        self.beta_label = ctk.CTkLabel(self.blx_frame, text="BLX Beta (β):", font=ctk.CTkFont(weight="bold"))
+        self.beta_entry = ctk.CTkEntry(self.blx_frame)
         self.beta_entry.insert(0, "0.75")
 
-        # --- MUTATION ---
-        self.mut_sect = tk.Frame(self.tab_real, bg=COLORS["bg_panel"])
+        self.mut_sect = ctk.CTkFrame(self.tab_real, fg_color="transparent")
         self.mut_sect.pack(fill="x", pady=5)
 
         self.add_label(self.mut_sect, "Mutation Method:")
-        self.mut_combo_real = ttk.Combobox(self.mut_sect, values=["Uniform", "Gaussian"], state="readonly")
+        self.mut_combo_real = ctk.CTkOptionMenu(self.mut_sect, values=["Uniform", "Gaussian"], command=self.update_visibility)
         self.mut_combo_real.set("Gaussian")
         self.mut_combo_real.pack(fill="x", padx=20, pady=5)
 
-        # Gaussian Sigma
-        self.gauss_frame = tk.Frame(self.mut_sect, bg=COLORS["bg_panel"])
-        self.sigma_label = tk.Label(self.gauss_frame, text="Gauss Sigma (\u03c3):", font=FONTS["header"],
-                                    bg=COLORS["bg_panel"], fg=COLORS["text_main"])
-        self.sigma_entry = tk.Entry(self.gauss_frame, font=FONTS["body"], relief="solid", bd=1)
+        # Gaussian
+        self.gauss_frame = ctk.CTkFrame(self.mut_sect, fg_color="transparent")
+        self.sigma_label = ctk.CTkLabel(self.gauss_frame, text="Gauss Sigma (σ):", font=ctk.CTkFont(weight="bold"))
+        self.sigma_entry = ctk.CTkEntry(self.gauss_frame)
         self.sigma_entry.insert(0, "0.5")
 
     def update_visibility(self, event=None):
         cross_val = self.cross_combo_real.get()
         mut_val = self.mut_combo_real.get()
 
-        # 1. BLX crossover
         if "BLX" in cross_val:
             self.blx_frame.pack(fill="x")
-            self.alpha_label.pack(anchor="w", padx=20, pady=(10, 0))
-            self.alpha_entry.pack(fill="x", padx=20, pady=5)
-
-            if cross_val == "BLX-\u03b1-\u03b2":
-                self.beta_label.pack(anchor="w", padx=20, pady=(10, 0))
-                self.beta_entry.pack(fill="x", padx=20, pady=5)
+            self.alpha_label.pack(anchor="w", padx=20, pady=(5, 0))
+            self.alpha_entry.pack(fill="x", padx=20, pady=0)
+            if cross_val == "BLX-α-β":
+                self.beta_label.pack(anchor="w", padx=20, pady=(5, 0))
+                self.beta_entry.pack(fill="x", padx=20, pady=0)
             else:
                 self.beta_label.pack_forget()
                 self.beta_entry.pack_forget()
         else:
             self.blx_frame.pack_forget()
 
-        # 2. Gaussian mutation
         if mut_val == "Gaussian":
             self.gauss_frame.pack(fill="x")
-            self.sigma_label.pack(anchor="w", padx=20, pady=(10, 0))
-            self.sigma_entry.pack(fill="x", padx=20, pady=5)
+            self.sigma_label.pack(anchor="w", padx=20, pady=(5, 0))
+            self.sigma_entry.pack(fill="x", padx=20, pady=0)
         else:
             self.gauss_frame.pack_forget()
 
     def setup_comparison_tab(self):
-        """Sets up the Matchup Board in the Comparison tab."""
+        self.matchup_container = ctk.CTkFrame(self.tab_compare, fg_color="transparent")
+        self.matchup_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.matchup_container = tk.Frame(self.tab_compare, bg=COLORS["bg_panel"])
-        self.matchup_container.pack(fill="both", expand=True, padx=20, pady=20)
-
-        # Header
-        tk.Label(self.matchup_container, text="⚔️ MATCHUP SUMMARY",
-                 font=FONTS.get("header", ("Arial", 12, "bold")),
-                 bg=COLORS["bg_panel"], fg=COLORS["accent"]).pack(pady=(0, 15))
-
-        self.matchup_info = tk.Text(
+        ctk.CTkLabel(
             self.matchup_container,
-            height=10,
-            font=("Consolas", 9),
-            bg="#f0f0f0",
-            fg=COLORS["text_main"],
-            relief="flat",
-            padx=10, pady=10
-        )
-        self.matchup_info.pack(fill="both", expand=True)
-        self.matchup_info.insert("1.0", "Select Comparison tab to refresh data...")
-        self.matchup_info.config(state="disabled")
+            text="⚔️ MATCHUP SUMMARY",
+            font=ctk.CTkFont(weight="bold", size=16),
+            text_color="#D3E0D7"
+        ).pack(pady=(0, 15))
 
-        tk.Label(
+        # --- BINARY ---
+        self.bin_card = ctk.CTkFrame(self.matchup_container, fg_color="#24332D", corner_radius=8)
+        self.bin_card.pack(fill="x", pady=(0, 5))
+
+        self.bin_title = ctk.CTkLabel(self.bin_card, text="💻 BINARY ALGORITHM", font=ctk.CTkFont(weight="bold", size=15), text_color="#FFFFFF")
+        self.bin_title.pack(pady=(10, 0))
+
+        self.bin_stats = ctk.CTkLabel(self.bin_card, text="Crossover: ---\nMutation: ---", font=ctk.CTkFont(size=14), justify="center", text_color="#D3E0D7")
+        self.bin_stats.pack(pady=(5, 10))
+
+        # --- VS ---
+        self.vs_badge = ctk.CTkLabel(self.matchup_container, text="VS", font=ctk.CTkFont(weight="bold", size=15), text_color="#4E6E5D")
+        self.vs_badge.pack(pady=5)
+
+        # --- REAL ---
+        self.real_card = ctk.CTkFrame(self.matchup_container, fg_color="#24332D", corner_radius=8)
+        self.real_card.pack(fill="x", pady=(5, 15))
+
+        self.real_title = ctk.CTkLabel(self.real_card, text="📈 REAL ALGORITHM", font=ctk.CTkFont(weight="bold", size=15), text_color="#FFFFFF")
+        self.real_title.pack(pady=(10, 0))
+
+        self.real_stats = ctk.CTkLabel(self.real_card, text="Crossover: ---\nMutation: ---", font=ctk.CTkFont(size=14), justify="center", text_color="#D3E0D7")
+        self.real_stats.pack(pady=(5, 10))
+
+        ctk.CTkLabel(
             self.matchup_container,
             text="* Settings gathered from other tabs",
-            font=("Arial", 7, "italic"),
-            bg=COLORS["bg_panel"], fg=COLORS["text_muted"]
-        ).pack(side="bottom", pady=2)
+            font=ctk.CTkFont(size=12, slant="italic"),
+            text_color="gray"
+        ).pack(side="bottom", pady=5)
 
     def setup_shared_parameters(self):
-        shared_frame = tk.LabelFrame(self.sidebar, text="Shared Parameters", bg=COLORS["bg_panel"],
-                                     font=FONTS["header"])
+        shared_frame = ctk.CTkFrame(self.sidebar)
         shared_frame.pack(fill="x", padx=15, pady=10)
+        for i in range(4):
+            shared_frame.grid_columnconfigure(i, weight=1)
+
+        ctk.CTkLabel(
+            shared_frame,
+            text="Shared Parameters",
+            font=ctk.CTkFont(weight="bold", size=14)
+        ).grid(row=0, column=0, columnspan=4, pady=(12, 8), sticky="ew")
 
         def add_param_row(row, label1, widget1, label2, widget2):
-            tk.Label(shared_frame, text=label1, bg=COLORS["bg_panel"]).grid(row=row, column=0, sticky="w", pady=6,
-                                                                            padx=(10, 2))
-            widget1.grid(row=row, column=1, sticky="w", pady=6, padx=2)
-            tk.Label(shared_frame, text=label2, bg=COLORS["bg_panel"]).grid(row=row, column=2, sticky="w", pady=6,
-                                                                            padx=(15, 2))
-            widget2.grid(row=row, column=3, sticky="w", pady=6, padx=(2, 10))
+            ctk.CTkLabel(shared_frame, text=label1).grid(row=row, column=0, sticky="w", pady=8, padx=(15, 5))
+            widget1.grid(row=row, column=1, sticky="w", pady=8, padx=5)
+            ctk.CTkLabel(shared_frame, text=label2).grid(row=row, column=2, sticky="w", pady=8, padx=(15, 5))
+            widget2.grid(row=row, column=3, sticky="w", pady=8, padx=(5, 15))
 
-        self.pop_entry = tk.Entry(shared_frame, width=10)
+        self.pop_entry = ctk.CTkEntry(shared_frame, width=80)
         self.pop_entry.insert(0, "50")
-        self.gen_entry = tk.Entry(shared_frame, width=10)
+        self.gen_entry = ctk.CTkEntry(shared_frame, width=80)
         self.gen_entry.insert(0, "100")
-        add_param_row(0, "Population:", self.pop_entry, "Generations:", self.gen_entry)
+        add_param_row(1, "Population:", self.pop_entry, "Generations:", self.gen_entry)
 
-        self.dim_entry = tk.Entry(shared_frame, width=10)
+        self.dim_entry = ctk.CTkEntry(shared_frame, width=80)
         self.dim_entry.insert(0, "2")
-        self.opt_combo = ttk.Combobox(shared_frame, values=["Min", "Max"], state="readonly", width=7)
+        self.opt_combo = ctk.CTkOptionMenu(shared_frame, values=["Min", "Max"], width=80)
         self.opt_combo.set("Min")
-        add_param_row(1, "Dimensions:", self.dim_entry, "Opt Type:", self.opt_combo)
+        add_param_row(2, "Dimensions:", self.dim_entry, "Opt Type:", self.opt_combo)
 
-        self.cr_entry = tk.Entry(shared_frame, width=10)
+        self.cr_entry = ctk.CTkEntry(shared_frame, width=80)
         self.cr_entry.insert(0, "0.8")
-        self.mr_entry = tk.Entry(shared_frame, width=10)
+        self.mr_entry = ctk.CTkEntry(shared_frame, width=80)
         self.mr_entry.insert(0, "0.1")
-        add_param_row(2, "Cross Rate:", self.cr_entry, "Mut Rate:", self.mr_entry)
+        add_param_row(3, "Cross Rate:", self.cr_entry, "Mut Rate:", self.mr_entry)
 
-        self.lb_entry = tk.Entry(shared_frame, width=10)
+        self.lb_entry = ctk.CTkEntry(shared_frame, width=80)
         self.lb_entry.insert(0, "-5.0")
-        self.ub_entry = tk.Entry(shared_frame, width=10)
+        self.ub_entry = ctk.CTkEntry(shared_frame, width=80)
         self.ub_entry.insert(0, "5.0")
-        add_param_row(3, "Lower Bound:", self.lb_entry, "Upper Bound:", self.ub_entry)
+        add_param_row(4, "Lower Bound:", self.lb_entry, "Upper Bound:", self.ub_entry)
 
-        self.elite_entry = tk.Entry(shared_frame, width=10)
+        self.elite_entry = ctk.CTkEntry(shared_frame, width=80)
         self.elite_entry.insert(0, "2")
-        self.selection_combo = ttk.Combobox(shared_frame, values=["Best", "Roulette", "Tournament"], state="readonly", width=8)
+        self.selection_combo = ctk.CTkOptionMenu(shared_frame, values=["Best", "Roulette", "Tournament"], width=80)
         self.selection_combo.set("Tournament")
-        add_param_row(4, "Elite Size:", self.elite_entry, "Selection:", self.selection_combo)
+        add_param_row(5, "Elite Size:", self.elite_entry, "Selection:", self.selection_combo)
 
     def add_label(self, parent, text):
-        tk.Label(parent, text=text, font=FONTS["header"], bg=COLORS["bg_panel"], fg=COLORS["text_main"]).pack(
-            anchor="w", padx=20, pady=(10, 0))
+        ctk.CTkLabel(parent, text=text, font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=20, pady=(10, 0))
 
     def add_entry(self, parent, default_val):
-        entry = tk.Entry(parent, font=FONTS["body"], relief="solid", bd=1)
+        entry = ctk.CTkEntry(parent)
         entry.insert(0, default_val)
         entry.pack(fill="x", padx=20, pady=5)
         return entry
-    
