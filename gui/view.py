@@ -109,15 +109,15 @@ class MainView:
         self.inv_entry = self.add_entry(self.tab_binary, "0.05")
 
         self.add_label(self.tab_binary, "Crossover Method:")
-        self.cross_combo_bin = ttk.Combobox(self.tab_binary, values=["one_point", "two_point", "uniform", "grainy"],
+        self.cross_combo_bin = ttk.Combobox(self.tab_binary, values=["One-Point", "Two-Point", "Uniform", "Grainy"],
                                             state="readonly")
-        self.cross_combo_bin.set("one_point")
+        self.cross_combo_bin.set("One-Point")
         self.cross_combo_bin.pack(fill="x", padx=20, pady=5)
 
         self.add_label(self.tab_binary, "Mutation Method:")
-        self.mut_combo_bin = ttk.Combobox(self.tab_binary, values=["bit_flip", "boundary", "single_point", "two_point"],
+        self.mut_combo_bin = ttk.Combobox(self.tab_binary, values=["Bit-Flip", "Boundary", "Single-Point", "Two-Point"],
                                           state="readonly")
-        self.mut_combo_bin.set("bit_flip")
+        self.mut_combo_bin.set("Bit-Flip")
         self.mut_combo_bin.pack(fill="x", padx=20, pady=5)
 
     def setup_real_tab(self):
@@ -128,16 +128,15 @@ class MainView:
         self.add_label(self.cross_sect, "Crossover Method:")
         self.cross_combo_real = ttk.Combobox(
             self.cross_sect,
-            values=["arithmetic", "linear", "blx_alpha", "blx_alpha_beta", "averaging"],
+            values=["Arithmetic", "Linear", "BLX-\u03b1", "BLX-\u03b1-\u03b2", "Averaging"],
             state="readonly"
         )
-        self.cross_combo_real.set("arithmetic")
+        self.cross_combo_real.set("Arithmetic")
         self.cross_combo_real.pack(fill="x", padx=20, pady=5)
 
         # BLX (Alfa, Beta)
         self.blx_frame = tk.Frame(self.cross_sect, bg=COLORS["bg_panel"])
 
-        # Tworzymy widgety, ale nie pakujemy ich jeszcze
         self.alpha_label = tk.Label(self.blx_frame, text="BLX Alpha (\u03b1):", font=FONTS["header"],
                                     bg=COLORS["bg_panel"], fg=COLORS["text_main"])
         self.alpha_entry = tk.Entry(self.blx_frame, font=FONTS["body"], relief="solid", bd=1)
@@ -153,8 +152,8 @@ class MainView:
         self.mut_sect.pack(fill="x", pady=5)
 
         self.add_label(self.mut_sect, "Mutation Method:")
-        self.mut_combo_real = ttk.Combobox(self.mut_sect, values=["uniform", "gaussian"], state="readonly")
-        self.mut_combo_real.set("gaussian")
+        self.mut_combo_real = ttk.Combobox(self.mut_sect, values=["Uniform", "Gaussian"], state="readonly")
+        self.mut_combo_real.set("Gaussian")
         self.mut_combo_real.pack(fill="x", padx=20, pady=5)
 
         # Gaussian Sigma
@@ -169,12 +168,12 @@ class MainView:
         mut_val = self.mut_combo_real.get()
 
         # 1. BLX crossover
-        if "blx" in cross_val:
-            self.blx_frame.pack(fill="x")  # Pakuje się NA KOŃCU swojej sekcji (pod dropdownem)
+        if "BLX" in cross_val:
+            self.blx_frame.pack(fill="x")
             self.alpha_label.pack(anchor="w", padx=20, pady=(10, 0))
             self.alpha_entry.pack(fill="x", padx=20, pady=5)
 
-            if cross_val == "blx_alpha_beta":
+            if cross_val == "BLX-\u03b1-\u03b2":
                 self.beta_label.pack(anchor="w", padx=20, pady=(10, 0))
                 self.beta_entry.pack(fill="x", padx=20, pady=5)
             else:
@@ -184,7 +183,7 @@ class MainView:
             self.blx_frame.pack_forget()
 
         # 2. Gaussian mutation
-        if mut_val == "gaussian":
+        if mut_val == "Gaussian":
             self.gauss_frame.pack(fill="x")
             self.sigma_label.pack(anchor="w", padx=20, pady=(10, 0))
             self.sigma_entry.pack(fill="x", padx=20, pady=5)
@@ -261,8 +260,8 @@ class MainView:
 
         self.elite_entry = tk.Entry(shared_frame, width=10)
         self.elite_entry.insert(0, "2")
-        self.selection_combo = ttk.Combobox(shared_frame, values=["best", "roulette", "tournament"], state="readonly", width=8)
-        self.selection_combo.set("tournament")
+        self.selection_combo = ttk.Combobox(shared_frame, values=["Best", "Roulette", "Tournament"], state="readonly", width=8)
+        self.selection_combo.set("Tournament")
         add_param_row(4, "Elite Size:", self.elite_entry, "Selection:", self.selection_combo)
 
     def add_label(self, parent, text):

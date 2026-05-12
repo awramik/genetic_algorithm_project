@@ -14,6 +14,13 @@ from ga_real.genetic_algorithm import run_genetic_algorithm as run_real_ga
 from visualization.plotting import create_convergence_figure
 from results.logger import save_results
 
+PARAM_MAP = {
+    "One-Point": "one_point", "Two-Point": "two_point", "Uniform": "uniform", "Grainy": "grainy",
+    "Bit-Flip": "bit_flip", "Boundary": "boundary", "Single-Point": "single_point",
+    "Arithmetic": "arithmetic", "Linear": "linear", "BLX-\u03b1": "blx_alpha", "BLX-\u03b1-\u03b2": "blx_alpha_beta", "Averaging": "averaging",
+    "Gaussian": "gaussian", "Best": "best", "Roulette": "roulette", "Tournament": "tournament"
+}
+
 
 class GeneticAlgorithmController:
     def __init__(self, root):
@@ -37,7 +44,13 @@ class GeneticAlgorithmController:
     # --- UI EVENTS ---
     def on_tab_change(self, event):
         """Handles logic when the user switches tabs."""
-        active_tab = self.view.notebook.index(self.view.notebook.select())
+        try:
+            selected_tab = self.view.notebook.select()
+            if not selected_tab:
+                return
+            active_tab = self.view.notebook.index(selected_tab)
+        except tk.TclError:
+            return
 
         # 1. Reset progress bar
         self.view.progress_bar["value"] = 0
@@ -45,7 +58,7 @@ class GeneticAlgorithmController:
         # 2. Reset status label
         self.view.status_label.config(text="Ready. Select parameters and run.")
 
-        # 3. CLEAR RESULTS CONSOLE (UX Improvement)
+        # 3. RESULTS CONSOLE
         self.view.results_console.config(state="normal")
         self.view.results_console.delete("1.0", tk.END)
         self.view.results_console.insert("1.0", "Run the evolution to see the results...")
@@ -81,17 +94,17 @@ class GeneticAlgorithmController:
                     f"   Crossover: {r_cross}\n"
 
         # BLX param
-        if "blx" in r_cross:
+        if "BLX" in r_cross:
             alpha = self.view.alpha_entry.get()
-            if r_cross == "blx_alpha_beta":
+            if r_cross == "BLX-\u03b1-\u03b2":
                 beta = self.view.beta_entry.get()
-                real_part += f"   (α={alpha}, β={beta})\n"
+                real_part += f"   (\u03b1={alpha}, \u03b2={beta})\n"
             else:
-                real_part += f"   (α={alpha})\n"
+                real_part += f"   (\u03b1={alpha})\n"
 
         real_part += f"   Mutation:  {r_mut}"
         if r_mut == "gaussian":
-            real_part += f" (σ={self.view.sigma_entry.get()})"
+            real_part += f" (\u03c3={self.view.sigma_entry.get()})"
 
         full_text = f"{binary_part}{vs_part}{real_part}"
 
@@ -100,6 +113,48 @@ class GeneticAlgorithmController:
         self.view.matchup_info.delete("1.0", tk.END)
         self.view.matchup_info.insert("1.0", full_text)
         self.view.matchup_info.config(state="disabled")
+
+    def set_ui_state(self, state):
+        """Locks or unlocks the entire input panel to prevent user interference during evolution."""
+        # 1. Text Entries
+        entries = [
+            self.view.pop_entry, self.view.gen_entry, self.view.dim_entry,
+            self.view.cr_entry, self.view.mr_entry, self.view.lb_entry,
+            self.view.ub_entry, self.view.elite_entry, self.view.exp_name_entry,
+            self.view.bits_entry, self.view.inv_entry, self.view.alpha_entry,
+            self.view.beta_entry, self.view.sigma_entry
+        ]
+        for entry in entries:
+            entry.config(state=state)
+
+        # 2. Comboboxes (normal state for combo is 'readonly')
+        combo_state = "readonly" if state == tk.NORMAL else tk.DISABLED
+        combos = [
+            self.view.opt_combo, self.view.selection_combo,
+            self.view.cross_combo_bin, self.view.mut_combo_bin,
+            self.view.cross_combo_real, self.view.mut_combo_real
+        ]
+        for combo in combos:
+            combo.config(state=combo_state)
+
+        # 3. Notebook tabs (prevents switching between Binary/Real/Comparison)
+        tab_state = "normal" if state == tk.NORMAL else "disabled"
+
+        try:
+            current_tab_index = self.view.notebook.index(self.view.notebook.select())
+        except tk.TclError:
+            current_tab_index = -1
+
+        for i in range(self.view.notebook.index("end")):
+            if state == tk.DISABLED and i == current_tab_index:
+                continue
+            self.view.notebook.tab(i, state=tab_state)
+
+        # 4. Cursor change
+        if state == tk.DISABLED:
+            self.root.config(cursor="watch")
+        else:
+            self.root.config(cursor="")
 
     def get_and_validate_params(self, tab_index):
         """Fetches, converts, and validates GUI parameters with error aggregation and highlighting."""
@@ -148,7 +203,7 @@ class GeneticAlgorithmController:
 
         # Text fields / Dropdowns
         p['opt'] = self.view.opt_combo.get()
-        p['sel'] = self.view.selection_combo.get()
+        p['sel'] = PARAM_MAP[self.view.selection_combo.get()]
 
         self.view.exp_name_entry.config(bg=COLORS.get("entry_bg", "white"))
         p['exp_name'] = self.view.exp_name_entry.get().strip()
@@ -170,13 +225,19 @@ class GeneticAlgorithmController:
         if tab_index in [0, 2]:
             p['bits'] = validate_field(self.view.bits_entry, "Bits per variable", int, min_val=1)
             p['inv'] = validate_field(self.view.inv_entry, "Inversion rate", float, min_val=0.0, max_val=1.0)
-            p['cross_bin'] = self.view.cross_combo_bin.get()
-            p['mut_bin'] = self.view.mut_combo_bin.get()
+            p['cross_bin'] = PARAM_MAP[self.view.cross_combo_bin.get()]
+            p['mut_bin'] = PARAM_MAP[self.view.mut_combo_bin.get()]
+
+            if p['bits'] is not None and p['dim'] is not None:
+                chrom_len = p['bits'] * p['dim']
+                if p['cross_bin'] == "two_point" and chrom_len < 3:
+                    errors.append("Two-Point Crossover: requires total chromosome length (Bits * Dim) >= 3.")
+                    self.view.bits_entry.config(bg=COLORS.get("error_bg", "#ffcccc"))
 
         # === 3. REAL ALGORITHM PARAMS (Tabs 1 & 2) ===
         if tab_index in [1, 2]:
-            p['cross_real'] = self.view.cross_combo_real.get()
-            p['mut_real'] = self.view.mut_combo_real.get()
+            p['cross_real'] = PARAM_MAP[self.view.cross_combo_real.get()]
+            p['mut_real'] = PARAM_MAP[self.view.mut_combo_real.get()]
 
             if "blx" in p['cross_real']:
                 p['alpha'] = validate_field(self.view.alpha_entry, "Alpha (BLX)", float, min_val=0.0)
@@ -224,6 +285,7 @@ class GeneticAlgorithmController:
             return
 
         # 3. Change the view and start the thread with the 'params' dictionary frozen
+        self.set_ui_state(tk.DISABLED)
         self.view.start_button.config(state="disabled", text="Evolution in progress... ⏳")
         self.view.progress_bar["value"] = 0
         threading.Thread(target=self.execute_ga, args=(active_tab, params), daemon=True).start()
@@ -289,9 +351,13 @@ class GeneticAlgorithmController:
     # --- MAIN LOOP ---
     def execute_ga(self, tab_index, p):
         try:
+            last_val = [-1]
             if tab_index == 0:  # BINARY P1
                 def cb(c, t):
-                    self.root.after(0, lambda: self.update_progress((c / t) * 100))
+                    val = int((c / t) * 100)
+                    if val > last_val[0]:
+                        last_val[0] = val
+                        self.root.after(0, lambda v=val: self.update_progress(v))
 
                 raw = run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'], p['sel'],
                                     p['cross_bin'], p['mut_bin'], p['lb'], p['ub'], p['opt'], p['elite'], p['inv'], cb)
@@ -306,7 +372,10 @@ class GeneticAlgorithmController:
 
             elif tab_index == 1:  # REAL P2
                 def cb(c, t):
-                    self.root.after(0, lambda: self.update_progress((c / t) * 100))
+                    val = int((c / t) * 100)
+                    if val > last_val[0]:
+                        last_val[0] = val
+                        self.root.after(0, lambda v=val: self.update_progress(v))
 
                 raw = run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'],
                                   p['cross_real'], p['mut_real'], p['lb'], p['ub'], p['opt'], p['elite'],
@@ -321,7 +390,10 @@ class GeneticAlgorithmController:
 
             elif tab_index == 2:  # COMPARISON
                 def cb_b(c, t):
-                    self.root.after(0, lambda: self.update_progress((c / t) * 50))
+                    val = int((c / t) * 50)
+                    if val > last_val[0]:
+                        last_val[0] = val
+                        self.root.after(0, lambda v=val: self.update_progress(v))
 
                 res_bin = self.parse_results(
                     run_binary_ga(p['pop'], p['gen'], p['dim'], p['bits'], p['cr'], p['mr'],
@@ -329,7 +401,10 @@ class GeneticAlgorithmController:
                                   p['elite'], p['inv'], cb_b))
 
                 def cb_r(c, t):
-                    self.root.after(0, lambda: self.update_progress(50 + (c / t) * 50))
+                    val = int(50 + (c / t) * 50)
+                    if val > last_val[0]:
+                        last_val[0] = val
+                        self.root.after(0, lambda v=val: self.update_progress(v))
 
                 res_real = self.parse_results(
                     run_real_ga(p['pop'], p['gen'], p['dim'], p['cr'], p['mr'], p['sel'],
@@ -347,6 +422,7 @@ class GeneticAlgorithmController:
     # --- DRAW CHART ---
     def finalize_single(self, results, ga_type, filename):
         try:
+            plt.close('all')
             for widget in self.view.plot_panel.winfo_children():
                 widget.destroy()
             fig = create_convergence_figure(results['best_history'], results['avg_history'])
@@ -401,6 +477,7 @@ class GeneticAlgorithmController:
 
     def finalize_comparison(self, res_bin, res_real):
         try:
+            plt.close('all')
             for widget in self.view.plot_panel.winfo_children():
                 widget.destroy()
 
@@ -464,8 +541,10 @@ class GeneticAlgorithmController:
             self.root.after(1500, clear_bar)
 
     def reset_ui(self):
+        self.set_ui_state(tk.NORMAL)
         self.view.start_button.config(state="normal", text="START EVOLUTION 🧬")
         self.view.progress_bar["value"] = 100
+        self.view.update_visibility()
 
 
 def launch_gui():
