@@ -104,16 +104,16 @@ def run_genetic_algorithm(
                 child2 = mutate(child2, mutation_rate)
 
             elif mutation_method == "boundary":
-                child1 = boundary_mutation(child1)
-                child2 = boundary_mutation(child2)
+                child1 = boundary_mutation(child1, mutation_rate)
+                child2 = boundary_mutation(child2, mutation_rate)
 
             elif mutation_method == "single_point":
-                child1 = single_point_mutation(child1)
-                child2 = single_point_mutation(child2)
+                child1 = single_point_mutation(child1, mutation_rate)
+                child2 = single_point_mutation(child2, mutation_rate)
 
             else:
-                child1 = two_point_mutation(child1)
-                child2 = two_point_mutation(child2)
+                child1 = two_point_mutation(child1, mutation_rate)
+                child2 = two_point_mutation(child2, mutation_rate)
 
             # -------- inversion --------
             if random.random() < inversion_rate:

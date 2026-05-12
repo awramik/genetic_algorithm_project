@@ -24,6 +24,7 @@ class GeneticAlgorithmController:
         self.root = root
         self.root.title("Genetic Algorithm Dashboard")
         self.root.geometry("1500x1000")
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # 1. VIEW
         self.view = MainView(self.root)
@@ -317,7 +318,7 @@ class GeneticAlgorithmController:
             chrom_str = ", ".join([f"{x:.4f}" for x in chrom]) if isinstance(chrom, list) else str(chrom)
 
             msg = f"🏆 Best Value (Fitness): {best_val:.8f}\n"
-            msg += f"⏱ Execution Time: {results['execution_time']:.3f} s\n"
+            msg += f"🕒 Execution Time: {results['execution_time']:.3f} s\n"
             msg += f"📁 Logs: {filename}\n"
             msg += f"🧬 Winning Chromosome:\n[{chrom_str}]\n"
 
@@ -340,7 +341,7 @@ class GeneticAlgorithmController:
             plt.close('all')
             for widget in self.view.plot_panel.winfo_children(): widget.destroy()
 
-            fig, ax = plt.subplots(figsize=(8, 6), facecolor='#E8EFEA')
+            fig, ax = plt.subplots(figsize=(6, 4), facecolor='#E8EFEA')
             ax.set_facecolor('#E8EFEA')
             ax.plot(res_bin['best_history'], label="Binary Encoding (P1)", color="#1E3628", linewidth=2.5)
             ax.plot(res_real['best_history'], label="Real Encoding (P2)", color="#A65D37", linewidth=2.5, linestyle="--")
@@ -367,8 +368,15 @@ class GeneticAlgorithmController:
                     return ", ".join([f"{x:.4f}" for x in chrom])
                 return str(chrom)
 
-            msg = f"💻 BINARY ALGORITHM:\nValue: {res_bin.get('best_value', 0):.8f} s\nTime: {res_bin.get('execution_time', 0):.3f} s\nChromosome: [{format_chrom(res_bin.get('best_individual', 'No data'))}]\n\n"
-            msg += f"📈 REAL-CODED ALGORITHM:\nValue: {res_real.get('best_value', 0):.8f} s\nTime: {res_real.get('execution_time', 0):.3f} s\nChromosome: [{format_chrom(res_real.get('best_individual', 'No data'))}]\n"
+            msg = f"💻 BINARY ALGORITHM:\n"
+            msg += f"🏆 Best Value (Fitness): {res_bin.get('best_value', 0):.8f}\n"
+            msg += f"🕒 Execution Time: {res_bin.get('execution_time', 0):.3f} s\n"
+            msg += f"🧬 Winning Chromosome:\n[{format_chrom(res_bin.get('best_individual', 'No data'))}]\n\n"
+
+            msg += f"📈 REAL-CODED ALGORITHM:\n"
+            msg += f"🏆 Best Value (Fitness): {res_real.get('best_value', 0):.8f}\n"
+            msg += f"🕒 Execution Time: {res_real.get('execution_time', 0):.3f} s\n"
+            msg += f"🧬 Winning Chromosome:\n[{format_chrom(res_real.get('best_individual', 'No data'))}]\n"
 
             diff = abs(res_bin.get('best_value', 0) - res_real.get('best_value', 0))
             self.view.status_label.configure(text=f"✅ Comparison finished! Value difference: {diff:.6f}", text_color="green")
@@ -389,6 +397,13 @@ class GeneticAlgorithmController:
         self.view.start_button.configure(state="normal", text="START EVOLUTION 🧬")
         self.view.progress_bar.set(1.0)
         self.view.update_visibility()
+
+    def on_closing(self):
+        """Hard memory cleanup when exiting the application."""
+
+        plt.close('all')
+        self.root.quit()
+        self.root.destroy()
 
 
 # def launch_gui():

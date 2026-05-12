@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 def create_convergence_figure(best_history, avg_history):
     generations = list(range(len(best_history)))
 
-    fig, ax = plt.subplots(figsize=(8, 6), facecolor='#E8EFEA')
+    fig, ax = plt.subplots(figsize=(6, 4), facecolor='#E8EFEA')
     ax.set_facecolor('#E8EFEA')
 
     ax.plot(generations, best_history, label="Best", color="#1E3628", linewidth=2.5)

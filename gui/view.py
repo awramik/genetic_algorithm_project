@@ -55,13 +55,13 @@ class MainView:
         self.console_frame.pack(side="bottom", fill="x", pady=(15, 0))
 
         self.console_label = ctk.CTkLabel(self.console_frame, text="📊 FINAL RESULTS",
-                                          font=ctk.CTkFont(weight="bold", size=14))
+                                          font=ctk.CTkFont(weight="bold", size=15))
         self.console_label.pack(anchor="w", padx=10, pady=(5, 0))
 
         self.results_console = ctk.CTkTextbox(
             self.console_frame,
-            height=150,
-            font=ctk.CTkFont("Consolas", 14),
+            height=250,
+            font=ctk.CTkFont("Consolas", 15),
             activate_scrollbars=True
         )
         self.results_console.pack(fill="x", padx=10, pady=(0, 10))

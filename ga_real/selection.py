@@ -2,7 +2,7 @@
 import random
 
 
-def best_selection(results, num_parents):
+def best_selection(results, num_parents, top_percent=0.2):
     """
     Select best individuals based on fitness.
     """
@@ -13,10 +13,14 @@ def best_selection(results, num_parents):
         reverse=True
     )
 
+    pool_size = max(1, int(len(results) * top_percent))
+    best_pool = sorted_results[:pool_size]
+
     selected = []
 
-    for i in range(num_parents):
-        selected.append(sorted_results[i]["chromosome"])
+    for _ in range(num_parents):
+        parent = random.choice(best_pool)
+        selected.append(parent["chromosome"])
 
     return selected
 
