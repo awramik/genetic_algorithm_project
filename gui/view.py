@@ -11,7 +11,7 @@ class MainView:
         self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
 
         # === LEFT PANEL (Sidebar) ===
-        self.sidebar = ctk.CTkFrame(self.main_container, width=420)
+        self.sidebar = ctk.CTkFrame(self.main_container, width=460)
         self.sidebar.pack(side="left", fill="y", padx=(0, 20))
         self.sidebar.pack_propagate(False)
 
@@ -98,7 +98,7 @@ class MainView:
 
         self.add_label(self.tab_binary, "Crossover Method:")
         self.cross_combo_bin = ctk.CTkOptionMenu(self.tab_binary, values=["One-Point", "Two-Point", "Uniform", "Grainy"])
-        self.cross_combo_bin.set("One-Point")
+        self.cross_combo_bin.set("Uniform")
         self.cross_combo_bin.pack(fill="x", padx=20, pady=5)
 
         self.add_label(self.tab_binary, "Mutation Method:")
@@ -230,16 +230,16 @@ class MainView:
         add_param_row(1, "Population:", self.pop_entry, "Generations:", self.gen_entry)
 
         self.dim_entry = ctk.CTkEntry(shared_frame, width=80)
-        self.dim_entry.insert(0, "2")
+        self.dim_entry.insert(0, "5")
         self.opt_combo = ctk.CTkOptionMenu(shared_frame, values=["Min", "Max"], width=80)
         self.opt_combo.set("Min")
-        add_param_row(2, "Dimensions:", self.dim_entry, "Opt Type:", self.opt_combo)
+        add_param_row(2, "Dimensions:", self.dim_entry, "Optimization Type:", self.opt_combo)
 
         self.cr_entry = ctk.CTkEntry(shared_frame, width=80)
         self.cr_entry.insert(0, "0.8")
         self.mr_entry = ctk.CTkEntry(shared_frame, width=80)
         self.mr_entry.insert(0, "0.1")
-        add_param_row(3, "Cross Rate:", self.cr_entry, "Mut Rate:", self.mr_entry)
+        add_param_row(3, "Cross Rate:", self.cr_entry, "Mutation Rate:", self.mr_entry)
 
         self.lb_entry = ctk.CTkEntry(shared_frame, width=80)
         self.lb_entry.insert(0, "-5.0")
