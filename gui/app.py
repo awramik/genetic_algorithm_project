@@ -3,6 +3,8 @@ import customtkinter as ctk
 from tkinter import messagebox
 import threading
 import inspect
+import platform
+import subprocess
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
@@ -32,7 +34,21 @@ class GeneticAlgorithmController:
         # 2. LOGIC
         self.view.start_button.configure(command=self.on_run_click)
         self.view.notebook.configure(command=self.on_tab_change)
+        self.view.open_logs_btn.configure(command=self.open_logs_folder)
         self.view.update_visibility()
+
+    def open_logs_folder(self):
+        """Opens logs folder"""
+        path = os.path.abspath("results/logs")
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        if platform.system() == "Windows":
+            os.startfile(path)
+        elif platform.system() == "Darwin":  # macOS
+            subprocess.Popen(["open", path])
+        else:  # Linux
+            subprocess.Popen(["xdg-open", path])
 
     def on_tab_change(self):
         """Handles logic when the user switches tabs."""
@@ -226,16 +242,17 @@ class GeneticAlgorithmController:
         self.view.progress_bar.set(val / 100.0)
 
     def parse_results(self, raw):
-        if isinstance(raw, dict): return raw
+        if isinstance(raw, dict):
+            return raw
         return {"best_history": raw[0], "avg_history": raw[1], "execution_time": raw[2], "best_value": raw[0][-1] if raw[0] else 0, "best_individual": "No individual data"}
 
     def smart_logger(self, results, params, ga_type):
         try:
             pool = {
-                'best_individual': results.get('best_individual'), 'best_history': results['best_history'], 'avg_history': results['avg_history'],
-                'execution_time': results['execution_time'], 'selection_method': params.get('sel'), 'crossover_method': params.get('cross'),
-                'alpha': params.get('alpha'), 'beta': params.get('beta'), 'mutation_method': params.get('mut'), 'sigma': params.get('sigma'),
-                'population_size': params.get('pop'), 'generations': params.get('gen'), 'dimensions': params.get('dim'),
+                'ga_type': ga_type, 'std_history': results.get('std_history', []), 'best_individual': results.get('best_individual'), 'best_history': results['best_history'],
+                'avg_history': results['avg_history'], 'execution_time': results['execution_time'], 'selection_method': params.get('sel'),
+                'crossover_method': params.get('cross'), 'alpha': params.get('alpha'), 'beta': params.get('beta'), 'mutation_method': params.get('mut'),
+                'sigma': params.get('sigma'), 'population_size': params.get('pop'), 'generations': params.get('gen'), 'dimensions': params.get('dim'),
                 'chromosome_length': params.get('bits') * params.get('dim') if params.get('bits') and params.get('dim') else None,
                 'crossover_rate': params.get('cr'), 'mutation_rate': params.get('mr'), 'lower_bound': params.get('lb'),
                 'upper_bound': params.get('ub'), 'optimization_type': params.get('opt'), 'elite_size': params.get('elite'),

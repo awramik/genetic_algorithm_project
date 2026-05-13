@@ -11,6 +11,7 @@ from ga_real.selection import (
 from ga_real.crossover import crossover_population
 from ga_real.mutation import mutate_population
 from ga_real.elitism import elitism
+import statistics
 
 
 def run_genetic_algorithm(
@@ -36,6 +37,7 @@ def run_genetic_algorithm(
 
     best_history = []
     avg_history = []
+    std_history = []
 
     for generation in range(generations):
         # STEP 2: Population Assessment
@@ -52,6 +54,10 @@ def run_genetic_algorithm(
         avg_val = sum(ind['value'] for ind in evaluated_pop) / population_size
         best_history.append(best_val)
         avg_history.append(avg_val)
+
+        values = [ind['value'] for ind in evaluated_pop]
+        std_val = statistics.stdev(values) if len(values) > 1 else 0.0
+        std_history.append(std_val)
 
         # STEP 3: Elitism
         elite_individuals = elitism(evaluated_pop, elite_size)

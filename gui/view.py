@@ -54,9 +54,22 @@ class MainView:
         self.console_frame = ctk.CTkFrame(self.right_area)
         self.console_frame.pack(side="bottom", fill="x", pady=(15, 0))
 
-        self.console_label = ctk.CTkLabel(self.console_frame, text="📊 FINAL RESULTS",
-                                          font=ctk.CTkFont(weight="bold", size=15))
-        self.console_label.pack(anchor="w", padx=10, pady=(5, 0))
+        self.console_header = ctk.CTkFrame(self.console_frame, fg_color="transparent")
+        self.console_header.pack(fill="x", padx=10, pady=(5, 0))
+
+        self.console_label = ctk.CTkLabel(self.console_header, text="📊 FINAL RESULTS",
+                                          font=ctk.CTkFont(weight="bold", size=14))
+        self.console_label.pack(side="left")
+
+        self.open_logs_btn = ctk.CTkButton(
+            self.console_header,
+            text="↗ Open logs folder",
+            width=140,
+            height=25,
+            fg_color="#4E6E5D",
+            hover_color="#2C3E35"
+        )
+        self.open_logs_btn.pack(side="right")
 
         self.results_console = ctk.CTkTextbox(
             self.console_frame,

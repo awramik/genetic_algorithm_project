@@ -23,6 +23,7 @@ from ga_binary.elitism import elitism
 
 import random
 import time
+import statistics
 
 
 def run_genetic_algorithm(
@@ -50,6 +51,7 @@ def run_genetic_algorithm(
 
     best_history = []
     avg_history = []
+    std_history = []
 
     for generation in range(generations):
         results = evaluate_population(population, dimensions, lower_bound, upper_bound, optimization_type)
@@ -60,6 +62,10 @@ def run_genetic_algorithm(
         # average of a given generation
         avg_value = sum(ind["value"] for ind in results) / len(results)
         avg_history.append(avg_value)
+
+        values = [ind["value"] for ind in results]
+        std_value = statistics.stdev(values) if len(values) > 1 else 0.0
+        std_history.append(std_value)
 
         print(f"Generation {generation} | Best: {best['value']:.6f} | Avg: {avg_value:.6f}")
 
@@ -141,5 +147,6 @@ def run_genetic_algorithm(
         "best_value": best_final["value"],
         "best_history": best_history,
         "avg_history": avg_history,
+        "std_history": std_history,
         "execution_time": execution_time
     }
